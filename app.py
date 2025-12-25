@@ -16,7 +16,7 @@ from pathlib import Path
 # ==========================
 st.set_page_config(
     page_title="Annotations Manager",
-    page_icon="◆",
+    page_icon=Path("assets/annotation_logo.svg"),
     layout="centered",
     initial_sidebar_state="collapsed"
 )
@@ -423,7 +423,7 @@ def get_card_title(card_def: Dict[str, Any]) -> str:
 # ==========================
 
 # Header
-st.title("◆ Annotations Manager")
+st.title("Annotations Manager")
 st.markdown(
     "<div class='muted'>Add and delete annotations on Domo cards. "
     "Enter a card ID to get started.</div>",
