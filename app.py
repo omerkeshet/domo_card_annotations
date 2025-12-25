@@ -11,9 +11,253 @@ from typing import Any, Dict, List
 from datetime import datetime, date
 
 # ==========================
+# PAGE CONFIG & STYLING
+# ==========================
+st.set_page_config(
+    page_title="Annotations Manager",
+    page_icon="◆",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Custom CSS for corporate minimalist design
+st.markdown("""
+<style>
+    /* Import clean font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+    
+    /* Global styles */
+    .stApp {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Main container */
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1200px;
+    }
+    
+    /* Custom header */
+    .main-header {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #1a1a1a;
+        margin-bottom: 0.25rem;
+        letter-spacing: -0.02em;
+    }
+    
+    .sub-header {
+        font-size: 0.95rem;
+        color: #6b7280;
+        margin-bottom: 2rem;
+        font-weight: 400;
+    }
+    
+    /* Section headers */
+    .section-header {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #374151;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    /* Card styling */
+    .card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .card-dark {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Status badge */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .status-success {
+        background: #ecfdf5;
+        color: #059669;
+    }
+    
+    .status-info {
+        background: #eff6ff;
+        color: #2563eb;
+    }
+    
+    /* Card title display */
+    .card-title {
+        font-size: 1.125rem;
+        font-weight: 500;
+        color: #111827;
+    }
+    
+    .card-id {
+        font-size: 0.875rem;
+        color: #6b7280;
+        font-family: 'SF Mono', 'Monaco', monospace;
+    }
+    
+    /* Stats */
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 600;
+        color: #111827;
+        line-height: 1;
+    }
+    
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-top: 0.25rem;
+    }
+    
+    /* Input styling */
+    .stTextInput > div > div > input {
+        border-radius: 6px;
+        border: 1px solid #d1d5db;
+        padding: 0.625rem 0.875rem;
+        font-size: 0.875rem;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    .stTextArea > div > div > textarea {
+        border-radius: 6px;
+        border: 1px solid #d1d5db;
+        font-size: 0.875rem;
+    }
+    
+    .stSelectbox > div > div {
+        border-radius: 6px;
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 0.875rem;
+        padding: 0.5rem 1rem;
+        transition: all 0.15s ease;
+    }
+    
+    .stButton > button[kind="primary"] {
+        background: #111827;
+        color: white;
+        border: none;
+    }
+    
+    .stButton > button[kind="primary"]:hover {
+        background: #1f2937;
+    }
+    
+    .stButton > button[kind="secondary"] {
+        background: white;
+        color: #374151;
+        border: 1px solid #d1d5db;
+    }
+    
+    .stButton > button[kind="secondary"]:hover {
+        background: #f9fafb;
+        border-color: #9ca3af;
+    }
+    
+    /* Table styling */
+    .stDataFrame {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .stDataFrame [data-testid="stDataFrameResizable"] {
+        border: none;
+    }
+    
+    /* Divider */
+    hr {
+        border: none;
+        border-top: 1px solid #e5e7eb;
+        margin: 2rem 0;
+    }
+    
+    /* Form styling */
+    [data-testid="stForm"] {
+        border: none;
+        padding: 0;
+    }
+    
+    /* Color preview */
+    .color-dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+    
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6b7280;
+    }
+    
+    .empty-state-icon {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+    
+    /* Annotation row */
+    .annotation-item {
+        padding: 1rem;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .annotation-item:last-child {
+        border-bottom: none;
+    }
+    
+    /* Hide default form border */
+    section[data-testid="stForm"] > div {
+        border: none !important;
+        padding: 0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================
 # CONFIGURATION FROM SECRETS
 # ==========================
-# These values come from Streamlit Cloud secrets
 DOMO_INSTANCE = st.secrets["domo"]["instance"]
 DOMO_DEVELOPER_TOKEN = st.secrets["domo"]["developer_token"]
 
@@ -50,20 +294,17 @@ def fetch_kpi_definition(instance: str, token: str, card_id: str) -> Dict[str, A
     r.encoding = "utf-8"
     fetched = r.json()
     
-    # Extract dataSourceId from the columns metadata (it's called "sourceId" in columns)
     data_source_id = None
     columns = fetched.get("columns", [])
     if columns and len(columns) > 0:
         data_source_id = columns[0].get("sourceId")
     
-    # Add dataSourceId to each subscription (required for save)
     if data_source_id:
         subscriptions = fetched.get("definition", {}).get("subscriptions", {})
         for sub_name, sub_def in subscriptions.items():
             if "dataSourceId" not in sub_def:
                 sub_def["dataSourceId"] = data_source_id
     
-    # Store the dataSourceId for later use
     fetched["_dataSourceId"] = data_source_id
     
     return fetched
@@ -80,47 +321,37 @@ def save_card_definition(
     """Save the updated card definition back to Domo."""
     url = f"https://{instance}.domo.com/api/content/v3/cards/kpi/{card_id}"
     
-    # Get the dataSourceId
     data_source_id = card_def.get("_dataSourceId")
     if not data_source_id:
         columns = card_def.get("columns", [])
         if columns and len(columns) > 0:
             data_source_id = columns[0].get("sourceId")
     
-    # Get the definition
     definition = card_def.get("definition", {})
-    
-    # Get title from definition
     title = definition.get("title", "")
     
-    # Convert 'title' to 'dynamicTitle' format if needed
     if "dynamicTitle" not in definition:
         definition["dynamicTitle"] = {
             "text": [{"text": title, "type": "TEXT"}] if title else []
         }
     
-    # Add dynamicDescription if missing
     if "dynamicDescription" not in definition:
         definition["dynamicDescription"] = {
             "text": [],
             "displayOnCardDetails": True
         }
     
-    # Add description if missing
     if "description" not in definition:
         definition["description"] = ""
     
-    # Add controls if missing
     if "controls" not in definition:
         definition["controls"] = []
     
-    # Set up annotations
     if new_annotations is None:
         new_annotations = []
     if deleted_annotation_ids is None:
         deleted_annotation_ids = []
     
-    # Format new annotations
     formatted_new = []
     for ann in new_annotations:
         formatted_new.append({
@@ -135,20 +366,17 @@ def save_card_definition(
         "deleted": deleted_annotation_ids
     }
     
-    # Convert formulas to save format
     definition["formulas"] = {
         "dsUpdated": [],
         "dsDeleted": [],
         "card": []
     }
     
-    # Convert conditionalFormats to save format
     definition["conditionalFormats"] = {
         "card": [],
         "datasource": []
     }
     
-    # Convert segments to save format
     if "segments" in definition:
         segments = definition["segments"]
         if isinstance(segments, dict) and "active" in segments and "definitions" in segments:
@@ -159,7 +387,6 @@ def save_card_definition(
                 "delete": []
             }
     
-    # Build the payload
     save_payload = {
         "definition": definition,
         "dataProvider": {
@@ -184,80 +411,96 @@ def get_annotations(card_def: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 def get_card_title(card_def: Dict[str, Any]) -> str:
     """Get the card title."""
-    return card_def.get("definition", {}).get("title", "Unknown")
+    return card_def.get("definition", {}).get("title", "Untitled Card")
 
 
 # ==========================
 # STREAMLIT APP
 # ==========================
-st.set_page_config(
-    page_title="Domo Annotations Manager",
-    page_icon="📊",
-    layout="wide"
-)
 
-st.title("📊 Domo Card Annotations Manager")
-st.markdown("Add and delete annotations on Domo cards")
+# Header
+st.markdown('<p class="main-header">◆ Annotations Manager</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Manage annotations on Domo cards</p>', unsafe_allow_html=True)
 
-# Main content
-st.header("🔍 Load Card")
+# Card Loader Section
+if "card_def" not in st.session_state:
+    st.markdown('<p class="section-header">Load Card</p>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        card_id = st.text_input(
+            "Card ID",
+            placeholder="Enter card ID (e.g., 19344562)",
+            label_visibility="collapsed"
+        )
+    with col2:
+        load_button = st.button("Load Card", type="primary", use_container_width=True)
+    
+    if load_button:
+        if not card_id:
+            st.error("Please enter a Card ID")
+        else:
+            with st.spinner("Loading..."):
+                try:
+                    card_def = fetch_kpi_definition(DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id)
+                    st.session_state.card_def = card_def
+                    st.session_state.card_id = card_id
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error loading card: {str(e)}")
 
-card_id = st.text_input("Card ID", placeholder="e.g., 19344562")
-
-if st.button("Load Card", type="primary"):
-    if not card_id:
-        st.error("Please enter a Card ID")
-    else:
-        with st.spinner("Loading card..."):
-            try:
-                card_def = fetch_kpi_definition(DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id)
-                st.session_state.card_def = card_def
-                st.session_state.card_id = card_id
-                st.success(f"✅ Loaded card: **{get_card_title(card_def)}**")
-            except Exception as e:
-                st.error(f"❌ Error loading card: {str(e)}")
-
-# Show card content if loaded
+# Main Interface (when card is loaded)
 if "card_def" in st.session_state and "card_id" in st.session_state:
     card_def = st.session_state.card_def
     card_id = st.session_state.card_id
+    annotations = get_annotations(card_def)
+    
+    # Card Info Header
+    col1, col2, col3 = st.columns([4, 1, 1])
+    
+    with col1:
+        st.markdown(f'<p class="card-title">{get_card_title(card_def)}</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="card-id">ID: {card_id}</p>', unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f'<p class="stat-value">{len(annotations)}</p>', unsafe_allow_html=True)
+        st.markdown('<p class="stat-label">Annotations</p>', unsafe_allow_html=True)
+    
+    with col3:
+        if st.button("✕ Close", type="secondary"):
+            del st.session_state.card_def
+            del st.session_state.card_id
+            st.rerun()
     
     st.divider()
     
-    # Create two columns for Add and Delete
-    col1, col2 = st.columns(2)
+    # Two column layout
+    col_add, col_delete = st.columns(2, gap="large")
     
-    # ==========================
     # ADD ANNOTATION
-    # ==========================
-    with col1:
-        st.header("➕ Add Annotation")
+    with col_add:
+        st.markdown('<p class="section-header">Add Annotation</p>', unsafe_allow_html=True)
         
-        with st.form("add_annotation_form"):
+        with st.form("add_form", clear_on_submit=True):
             annotation_text = st.text_area(
-                "Annotation Text",
-                placeholder="Enter your annotation text here...",
+                "Text",
+                placeholder="Enter annotation text...",
                 height=100
             )
             
-            annotation_date = st.date_input(
-                "Annotation Date",
-                value=date.today()
-            )
+            col_date, col_color = st.columns(2)
+            with col_date:
+                annotation_date = st.date_input("Date", value=date.today())
+            with col_color:
+                color_name = st.selectbox("Color", options=list(ANNOTATION_COLORS.keys()))
             
-            color_name = st.selectbox(
-                "Color",
-                options=list(ANNOTATION_COLORS.keys()),
-                index=0
-            )
+            submitted = st.form_submit_button("Add Annotation", type="primary", use_container_width=True)
             
-            submit_add = st.form_submit_button("Add Annotation", type="primary")
-            
-            if submit_add:
+            if submitted:
                 if not annotation_text:
                     st.error("Please enter annotation text")
                 else:
-                    with st.spinner("Adding annotation..."):
+                    with st.spinner("Adding..."):
                         try:
                             new_annotation = {
                                 "content": annotation_text,
@@ -265,7 +508,7 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
                                 "color": ANNOTATION_COLORS[color_name],
                             }
                             
-                            result = save_card_definition(
+                            save_card_definition(
                                 DOMO_INSTANCE, 
                                 DOMO_DEVELOPER_TOKEN, 
                                 card_id, 
@@ -273,43 +516,38 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
                                 new_annotations=[new_annotation]
                             )
                             
-                            st.success(f"✅ Annotation added: '{annotation_text}' on {annotation_date}")
-                            
-                            # Reload card to refresh annotations
                             st.session_state.card_def = fetch_kpi_definition(
                                 DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id
                             )
+                            st.success("Annotation added")
                             st.rerun()
                             
                         except Exception as e:
-                            st.error(f"❌ Error adding annotation: {str(e)}")
+                            st.error(f"Error: {str(e)}")
     
-    # ==========================
     # DELETE ANNOTATION
-    # ==========================
-    with col2:
-        st.header("🗑️ Delete Annotation")
-        
-        annotations = get_annotations(card_def)
+    with col_delete:
+        st.markdown('<p class="section-header">Delete Annotation</p>', unsafe_allow_html=True)
         
         if annotations:
-            # Create a selection box with annotation info
-            annotation_options = {
-                f"{ann['id']} - {ann['content'][:50]}{'...' if len(ann['content']) > 50 else ''} ({ann['dataPoint'].get('point1', 'N/A')})": ann['id']
-                for ann in annotations
-            }
+            annotation_options = {}
+            for ann in annotations:
+                content_preview = ann['content'][:40] + ('...' if len(ann['content']) > 40 else '')
+                date_str = ann['dataPoint'].get('point1', 'N/A')
+                label = f"{content_preview} • {date_str}"
+                annotation_options[label] = ann['id']
             
-            selected_annotation = st.selectbox(
-                "Select Annotation to Delete",
-                options=list(annotation_options.keys())
+            selected = st.selectbox(
+                "Select annotation",
+                options=list(annotation_options.keys()),
+                label_visibility="collapsed"
             )
             
-            if st.button("Delete Annotation", type="secondary"):
-                annotation_id = annotation_options[selected_annotation]
-                
-                with st.spinner("Deleting annotation..."):
+            if st.button("Delete Selected", type="secondary", use_container_width=True):
+                annotation_id = annotation_options[selected]
+                with st.spinner("Deleting..."):
                     try:
-                        result = save_card_definition(
+                        save_card_definition(
                             DOMO_INSTANCE, 
                             DOMO_DEVELOPER_TOKEN, 
                             card_id, 
@@ -317,70 +555,72 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
                             deleted_annotation_ids=[annotation_id]
                         )
                         
-                        st.success(f"✅ Deleted annotation ID: {annotation_id}")
-                        
-                        # Reload card to refresh annotations
                         st.session_state.card_def = fetch_kpi_definition(
                             DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id
                         )
+                        st.success("Annotation deleted")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"❌ Error deleting annotation: {str(e)}")
+                        st.error(f"Error: {str(e)}")
         else:
-            st.info("No annotations on this card")
+            st.markdown("""
+                <div class="empty-state">
+                    <div class="empty-state-icon">📝</div>
+                    <p>No annotations to delete</p>
+                </div>
+            """, unsafe_allow_html=True)
     
-    # ==========================
-    # CURRENT ANNOTATIONS TABLE
-    # ==========================
     st.divider()
-    st.header("📋 Current Annotations")
     
-    if st.button("🔄 Refresh"):
-        with st.spinner("Refreshing..."):
-            st.session_state.card_def = fetch_kpi_definition(
-                DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id
-            )
-            st.rerun()
+    # ANNOTATIONS TABLE
+    col_header, col_refresh = st.columns([4, 1])
+    with col_header:
+        st.markdown('<p class="section-header">All Annotations</p>', unsafe_allow_html=True)
+    with col_refresh:
+        if st.button("↻ Refresh", type="secondary"):
+            with st.spinner(""):
+                st.session_state.card_def = fetch_kpi_definition(
+                    DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id
+                )
+                st.rerun()
     
     annotations = get_annotations(st.session_state.card_def)
     
     if annotations:
-        # Create a clean dataframe for display
         df_data = []
         for ann in annotations:
+            created_ts = ann.get("createdDate", 0)
+            created_str = datetime.fromtimestamp(created_ts / 1000).strftime("%Y-%m-%d %H:%M") if created_ts else "—"
+            
             df_data.append({
-                "ID": ann.get("id"),
                 "Content": ann.get("content"),
-                "Date": ann.get("dataPoint", {}).get("point1", "N/A"),
-                "Color": ann.get("color"),
-                "Created By": ann.get("userName", "Unknown"),
-                "Created At": datetime.fromtimestamp(
-                    ann.get("createdDate", 0) / 1000
-                ).strftime("%Y-%m-%d %H:%M") if ann.get("createdDate") else "N/A"
+                "Date": ann.get("dataPoint", {}).get("point1", "—"),
+                "Color": ann.get("color", "—"),
+                "Created By": ann.get("userName", "—"),
+                "Created": created_str,
+                "ID": ann.get("id"),
             })
         
         df = pd.DataFrame(df_data)
         
-        # Display with color indicators
         st.dataframe(
             df,
             use_container_width=True,
             hide_index=True,
             column_config={
-                "ID": st.column_config.NumberColumn("ID", format="%d"),
                 "Content": st.column_config.TextColumn("Content", width="large"),
-                "Date": st.column_config.TextColumn("Date"),
-                "Color": st.column_config.TextColumn("Color"),
-                "Created By": st.column_config.TextColumn("Created By"),
-                "Created At": st.column_config.TextColumn("Created At"),
+                "Date": st.column_config.TextColumn("Date", width="small"),
+                "Color": st.column_config.TextColumn("Color", width="small"),
+                "Created By": st.column_config.TextColumn("Created By", width="medium"),
+                "Created": st.column_config.TextColumn("Created", width="medium"),
+                "ID": st.column_config.NumberColumn("ID", width="small", format="%d"),
             }
         )
-        
-        st.caption(f"Total: {len(annotations)} annotations")
     else:
-        st.info("No annotations found on this card")
-
-# Footer
-st.divider()
-st.caption("Domo Annotations Manager | Built with Streamlit")
+        st.markdown("""
+            <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <p>No annotations on this card yet</p>
+            </div>
+        """, unsafe_allow_html=True)
