@@ -16,7 +16,7 @@ from pathlib import Path
 # ==========================
 st.set_page_config(
     page_title="Annotations Manager",
-    page_icon="◆",
+    page_icon=Path("assets/annotation_logo.svg"),
     layout="centered",
     initial_sidebar_state="collapsed"
 )
