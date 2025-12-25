@@ -16,7 +16,7 @@ from pathlib import Path
 # ==========================
 st.set_page_config(
     page_title="Annotations Manager",
-    page_icon=Path("assets/annotation_logo.svg"),
+    page_icon="◆",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
@@ -251,6 +251,23 @@ ANNOTATION_COLORS = {
     "Purple": "#9B5EE3",
 }
 
+# Domo users who can create annotations
+DOMO_USERS = [
+    (185253795, "Ariel Ron"),
+    (461573038, "Liron Akuny"),
+    (552394961, "Lital Tatuani"),
+    (1077384251, "Niv Shir"),
+    (385958743, "Omer Yarchi"),
+    (935904394, "Roi Green"),
+    (1430837746, "Sagiv Naor"),
+    (1377140685, "Shirly Laufer Harpo"),
+    (554866866, "Tal ugashi"),
+    (272049214, "Viki Livshits"),
+    (77632399, "Yakir Cohen"),
+    (270037743, "Yarden Sabadra"),
+    (424727770, "Yotam Abt"),
+]
+
 
 # ==========================
 # API FUNCTIONS
@@ -335,11 +352,17 @@ def save_card_definition(
     
     formatted_new = []
     for ann in new_annotations:
-        formatted_new.append({
+        new_ann = {
             "content": ann.get("content", ""),
             "dataPoint": ann.get("dataPoint", {}),
             "color": ann.get("color", "#72B0D7"),
-        })
+        }
+        # Include userId and userName if provided
+        if "userId" in ann:
+            new_ann["userId"] = ann["userId"]
+        if "userName" in ann:
+            new_ann["userName"] = ann["userName"]
+        formatted_new.append(new_ann)
     
     definition["annotations"] = {
         "new": formatted_new,
@@ -400,7 +423,7 @@ def get_card_title(card_def: Dict[str, Any]) -> str:
 # ==========================
 
 # Header
-st.title("Annotations Manager")
+st.title("◆ Annotations Manager")
 st.markdown(
     "<div class='muted'>Add and delete annotations on Domo cards. "
     "Enter a card ID to get started.</div>",
@@ -502,6 +525,12 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
                     st.markdown("<div class='tiny'>Color</div>", unsafe_allow_html=True)
                     color_name = st.selectbox("Color", options=list(ANNOTATION_COLORS.keys()), label_visibility="collapsed")
                 
+                st.markdown("<div class='tiny'>Created By</div>", unsafe_allow_html=True)
+                user_names = [name for (_, name) in DOMO_USERS]
+                selected_user_name = st.selectbox("User", options=user_names, label_visibility="collapsed")
+                # Get user ID from selected name
+                selected_user_id = next(uid for uid, name in DOMO_USERS if name == selected_user_name)
+                
                 submitted = st.form_submit_button("Add Annotation", type="primary", use_container_width=True)
                 
                 if submitted:
@@ -514,6 +543,8 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
                                     "content": annotation_text,
                                     "dataPoint": {"point1": annotation_date.strftime("%Y-%m-%d")},
                                     "color": ANNOTATION_COLORS[color_name],
+                                    "userId": selected_user_id,
+                                    "userName": selected_user_name,
                                 }
                                 
                                 save_card_definition(
