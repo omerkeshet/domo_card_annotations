@@ -400,7 +400,7 @@ def get_card_title(card_def: Dict[str, Any]) -> str:
 # ==========================
 
 # Header
-st.title("◆ Annotations Manager")
+st.title("Annotations Manager")
 st.markdown(
     "<div class='muted'>Add and delete annotations on Domo cards. "
     "Enter a card ID to get started.</div>",
