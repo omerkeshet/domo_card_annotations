@@ -24,11 +24,12 @@ st.set_page_config(
 st.markdown("""
 <style>
     /* Import clean font */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
     /* Global styles */
     .stApp {
         font-family: 'Inter', sans-serif;
+        background-color: #f3f4f6;
     }
     
     /* Hide Streamlit branding */
@@ -45,30 +46,40 @@ st.markdown("""
     
     /* Custom header */
     .main-header {
-        font-size: 1.75rem;
-        font-weight: 600;
-        color: #1a1a1a;
+        font-size: 2.25rem;
+        font-weight: 700;
+        color: #111827;
         margin-bottom: 0.25rem;
-        letter-spacing: -0.02em;
+        letter-spacing: -0.03em;
     }
     
     .sub-header {
-        font-size: 0.95rem;
+        font-size: 1rem;
         color: #6b7280;
         margin-bottom: 2rem;
         font-weight: 400;
     }
     
+    /* Section container */
+    .section-container {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    
     /* Section headers */
     .section-header {
-        font-size: 0.875rem;
-        font-weight: 600;
-        color: #374151;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #111827;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #e5e7eb;
     }
     
     /* Card styling */
@@ -109,9 +120,18 @@ st.markdown("""
     }
     
     /* Card title display */
+    .card-info-box {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    
     .card-title {
-        font-size: 1.125rem;
-        font-weight: 500;
+        font-size: 1.25rem;
+        font-weight: 600;
         color: #111827;
     }
     
@@ -210,8 +230,21 @@ st.markdown("""
     
     /* Form styling */
     [data-testid="stForm"] {
-        border: none;
-        padding: 0;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    
+    /* Vertical block styling */
+    [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] {
+        background: transparent;
+    }
+    
+    /* Column containers */
+    [data-testid="column"] > div {
+        background: transparent;
     }
     
     /* Color preview */
@@ -229,12 +262,35 @@ st.markdown("""
         text-align: center;
         padding: 3rem 1rem;
         color: #6b7280;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
     
     .empty-state-icon {
         font-size: 2.5rem;
         margin-bottom: 1rem;
         opacity: 0.5;
+    }
+    
+    /* Delete section container */
+    .delete-section {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        min-height: 200px;
+    }
+    
+    /* Table container */
+    .table-container {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
     
     /* Annotation row */
@@ -247,10 +303,9 @@ st.markdown("""
         border-bottom: none;
     }
     
-    /* Hide default form border */
-    section[data-testid="stForm"] > div {
+    /* Additional form cleanup */
+    section[data-testid="stForm"] > div:first-child {
         border: none !important;
-        padding: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
