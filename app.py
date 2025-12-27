@@ -408,7 +408,7 @@ st.markdown(
 )
 
 st.write("")
-#
+
 # Card Loader Section
 if "card_def" not in st.session_state:
     with st.container(border=True):
@@ -588,15 +588,17 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
     
     st.write("")
     
-    # ANNOTATIONS TABLE
+    # ANNOTATIONS TABLE/TIMELINE
     with st.container(border=True):
-        col_header, col_refresh = st.columns([4, 1])
+        col_header, col_toggle, col_refresh = st.columns([3, 1.5, 1])
         with col_header:
             st.markdown("<div class='label'>All Annotations</div>", unsafe_allow_html=True)
             st.markdown(
                 f"<div class='desc'>Showing {len(annotations)} annotation{'s' if len(annotations) != 1 else ''} on this card.</div>",
                 unsafe_allow_html=True,
             )
+        with col_toggle:
+            view_mode = st.toggle("Timeline View", value=False)
         with col_refresh:
             if st.button("↻ Refresh", type="secondary", use_container_width=True):
                 with st.spinner(""):
@@ -608,35 +610,113 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
         annotations = get_annotations(st.session_state.card_def)
         
         if annotations:
-            df_data = []
-            for ann in annotations:
-                created_ts = ann.get("createdDate", 0)
-                created_str = datetime.fromtimestamp(created_ts / 1000).strftime("%Y-%m-%d %H:%M") if created_ts else "—"
+            if view_mode:
+                # Timeline View
+                import plotly.express as px
+                import plotly.graph_objects as go
                 
-                df_data.append({
-                    "Content": ann.get("content"),
-                    "Date": ann.get("dataPoint", {}).get("point1", "—"),
-                    "Color": ann.get("color", "—"),
-                    "Created By": ann.get("userName", "—"),
-                    "Created": created_str,
-                    "ID": ann.get("id"),
-                })
-            
-            df = pd.DataFrame(df_data)
-            
-            st.dataframe(
-                df,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Content": st.column_config.TextColumn("Content", width="large"),
-                    "Date": st.column_config.TextColumn("Date", width="small"),
-                    "Color": st.column_config.TextColumn("Color", width="small"),
-                    "Created By": st.column_config.TextColumn("Created By", width="medium"),
-                    "Created": st.column_config.TextColumn("Created", width="medium"),
-                    "ID": st.column_config.NumberColumn("ID", width="small", format="%d"),
-                }
-            )
+                # Prepare data for timeline
+                timeline_data = []
+                for ann in annotations:
+                    date_str = ann.get("dataPoint", {}).get("point1", None)
+                    if date_str:
+                        timeline_data.append({
+                            "Date": date_str,
+                            "Content": ann.get("content", ""),
+                            "Color": ann.get("color", "#72B0D7"),
+                            "Created By": ann.get("userName", "Unknown"),
+                        })
+                
+                if timeline_data:
+                    df_timeline = pd.DataFrame(timeline_data)
+                    df_timeline["Date"] = pd.to_datetime(df_timeline["Date"])
+                    df_timeline = df_timeline.sort_values("Date")
+                    
+                    # Create timeline chart
+                    fig = go.Figure()
+                    
+                    # Add scatter points for each annotation
+                    for idx, row in df_timeline.iterrows():
+                        fig.add_trace(go.Scatter(
+                            x=[row["Date"]],
+                            y=[0],
+                            mode="markers+text",
+                            marker=dict(
+                                size=16,
+                                color=row["Color"],
+                                line=dict(width=2, color="white")
+                            ),
+                            text=[row["Content"][:30] + "..." if len(row["Content"]) > 30 else row["Content"]],
+                            textposition="top center",
+                            hovertemplate=(
+                                f"<b>{row['Content']}</b><br>"
+                                f"Date: {row['Date'].strftime('%Y-%m-%d')}<br>"
+                                f"By: {row['Created By']}<extra></extra>"
+                            ),
+                            showlegend=False
+                        ))
+                    
+                    # Update layout
+                    fig.update_layout(
+                        height=300,
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        xaxis=dict(
+                            title="",
+                            showgrid=True,
+                            gridcolor="rgba(0,0,0,0.05)",
+                        ),
+                        yaxis=dict(
+                            visible=False,
+                            range=[-0.5, 1]
+                        ),
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        hoverlabel=dict(
+                            bgcolor="white",
+                            font_size=13,
+                            font_family="Inter"
+                        )
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.markdown("""
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📅</div>
+                            <p>No annotations with valid dates</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+            else:
+                # Table View
+                df_data = []
+                for ann in annotations:
+                    created_ts = ann.get("createdDate", 0)
+                    created_str = datetime.fromtimestamp(created_ts / 1000).strftime("%Y-%m-%d %H:%M") if created_ts else "—"
+                    
+                    df_data.append({
+                        "Content": ann.get("content"),
+                        "Date": ann.get("dataPoint", {}).get("point1", "—"),
+                        "Color": ann.get("color", "—"),
+                        "Created By": ann.get("userName", "—"),
+                        "Created": created_str,
+                        "ID": ann.get("id"),
+                    })
+                
+                df = pd.DataFrame(df_data)
+                
+                st.dataframe(
+                    df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Content": st.column_config.TextColumn("Content", width="large"),
+                        "Date": st.column_config.TextColumn("Date", width="small"),
+                        "Color": st.column_config.TextColumn("Color", width="small"),
+                        "Created By": st.column_config.TextColumn("Created By", width="medium"),
+                        "Created": st.column_config.TextColumn("Created", width="medium"),
+                        "ID": st.column_config.NumberColumn("ID", width="small", format="%d"),
+                    }
+                )
         else:
             st.markdown("""
                 <div class="empty-state">
