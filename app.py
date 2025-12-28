@@ -736,32 +736,40 @@ with col_add:
                         st.session_state.card_ids.append(card_id_clean)
                         st.rerun()
         
-        # Display card ID tags with X inside
+        # Display card ID tags
         if st.session_state.card_ids:
-            tag_cols = st.columns(len(st.session_state.card_ids) + 1)  # +1 for spacing
-            for i, cid in enumerate(st.session_state.card_ids):
-                with tag_cols[i]:
-                    # Custom styled button using markdown + button
-                    st.markdown(f"""
-                        <style>
-                            div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{
-                                background: rgba(34, 197, 94, 0.15) !important;
-                                border: 1px solid rgba(34, 197, 94, 0.4) !important;
-                                color: #15803d !important;
-                                border-radius: 20px !important;
-                                font-weight: 600 !important;
-                                padding: 2px 12px !important;
-                            }}
-                            div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button:hover {{
-                                background: rgba(239, 68, 68, 0.15) !important;
-                                border-color: rgba(239, 68, 68, 0.4) !important;
-                                color: #dc2626 !important;
-                            }}
-                        </style>
-                    """, unsafe_allow_html=True)
-                    if st.button(f"✕ {cid}", key=f"remove_{cid}"):
-                        st.session_state.card_ids.remove(cid)
-                        st.rerun()
+            # Render tags as HTML
+            tags_html = '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0;">'
+            for cid in st.session_state.card_ids:
+                tags_html += f'''
+                    <span style="
+                        display: inline-flex;
+                        align-items: center;
+                        background: rgba(34, 197, 94, 0.15);
+                        border: 1px solid rgba(34, 197, 94, 0.4);
+                        color: #15803d;
+                        padding: 6px 12px;
+                        border-radius: 20px;
+                        font-size: 0.85rem;
+                        font-weight: 600;
+                    ">{cid}</span>
+                '''
+            tags_html += '</div>'
+            st.markdown(tags_html, unsafe_allow_html=True)
+            
+            # Remove option
+            col_remove, col_space = st.columns([2, 3])
+            with col_remove:
+                remove_id = st.selectbox(
+                    "Remove card",
+                    options=[""] + st.session_state.card_ids,
+                    format_func=lambda x: "Remove a card..." if x == "" else f"✕ Remove {x}",
+                    label_visibility="collapsed",
+                    key="remove_card_select"
+                )
+                if remove_id:
+                    st.session_state.card_ids.remove(remove_id)
+                    st.rerun()
         
         st.write("")
         
