@@ -264,6 +264,7 @@ ANNOTATION_COLORS = {
     "Red": "#FD7F76",
     "Yellow": "#F5C43D",
     "Purple": "#9B5EE3",
+    "Lavender": "#B391CA",
 }
 
 COLOR_NAME_MAP = {v: k for k, v in ANNOTATION_COLORS.items()}
@@ -736,40 +737,42 @@ with col_add:
                         st.session_state.card_ids.append(card_id_clean)
                         st.rerun()
         
-        # Display card ID tags
+        # Display card ID tags with X inside
         if st.session_state.card_ids:
-            # Render tags as HTML
-            tags_html = '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0;">'
-            for cid in st.session_state.card_ids:
-                tags_html += f'''
-                    <span style="
-                        display: inline-flex;
-                        align-items: center;
-                        background: rgba(34, 197, 94, 0.15);
-                        border: 1px solid rgba(34, 197, 94, 0.4);
-                        color: #15803d;
-                        padding: 6px 12px;
-                        border-radius: 20px;
-                        font-size: 0.85rem;
-                        font-weight: 600;
-                    ">{cid}</span>
-                '''
-            tags_html += '</div>'
-            st.markdown(tags_html, unsafe_allow_html=True)
+            st.markdown("""
+                <style>
+                    /* Style only buttons inside the card-tags-wrapper */
+                    .card-tags-wrapper button {
+                        background: rgba(34, 197, 94, 0.15) !important;
+                        border: 1px solid rgba(34, 197, 94, 0.4) !important;
+                        color: #15803d !important;
+                        border-radius: 20px !important;
+                        font-weight: 600 !important;
+                        padding: 4px 14px !important;
+                        font-size: 0.85rem !important;
+                        min-height: 0 !important;
+                        line-height: 1.4 !important;
+                    }
+                    .card-tags-wrapper button:hover {
+                        background: rgba(239, 68, 68, 0.15) !important;
+                        border-color: rgba(239, 68, 68, 0.4) !important;
+                        color: #dc2626 !important;
+                    }
+                    .card-tags-wrapper [data-testid="stHorizontalBlock"] {
+                        gap: 0.5rem;
+                    }
+                </style>
+                <div class="card-tags-wrapper">
+            """, unsafe_allow_html=True)
             
-            # Remove option
-            col_remove, col_space = st.columns([2, 3])
-            with col_remove:
-                remove_id = st.selectbox(
-                    "Remove card",
-                    options=[""] + st.session_state.card_ids,
-                    format_func=lambda x: "Remove a card..." if x == "" else f"✕ Remove {x}",
-                    label_visibility="collapsed",
-                    key="remove_card_select"
-                )
-                if remove_id:
-                    st.session_state.card_ids.remove(remove_id)
-                    st.rerun()
+            cols = st.columns(len(st.session_state.card_ids))
+            for i, cid in enumerate(st.session_state.card_ids):
+                with cols[i]:
+                    if st.button(f"✕ {cid}", key=f"tag_{cid}"):
+                        st.session_state.card_ids.remove(cid)
+                        st.rerun()
+            
+            st.markdown("</div>", unsafe_allow_html=True)
         
         st.write("")
         
