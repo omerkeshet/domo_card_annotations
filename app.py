@@ -739,40 +739,12 @@ with col_add:
         
         # Display card ID tags with X inside
         if st.session_state.card_ids:
-            st.markdown("""
-                <style>
-                    /* Style only buttons inside the card-tags-wrapper */
-                    .card-tags-wrapper button {
-                        background: rgba(34, 197, 94, 0.15) !important;
-                        border: 1px solid rgba(34, 197, 94, 0.4) !important;
-                        color: #15803d !important;
-                        border-radius: 20px !important;
-                        font-weight: 600 !important;
-                        padding: 4px 14px !important;
-                        font-size: 0.85rem !important;
-                        min-height: 0 !important;
-                        line-height: 1.4 !important;
-                    }
-                    .card-tags-wrapper button:hover {
-                        background: rgba(239, 68, 68, 0.15) !important;
-                        border-color: rgba(239, 68, 68, 0.4) !important;
-                        color: #dc2626 !important;
-                    }
-                    .card-tags-wrapper [data-testid="stHorizontalBlock"] {
-                        gap: 0.5rem;
-                    }
-                </style>
-                <div class="card-tags-wrapper">
-            """, unsafe_allow_html=True)
-            
             cols = st.columns(len(st.session_state.card_ids))
             for i, cid in enumerate(st.session_state.card_ids):
                 with cols[i]:
-                    if st.button(f"✕ {cid}", key=f"tag_{cid}"):
+                    if st.button(f"✕ {cid}", key=f"tag_{cid}", type="secondary"):
                         st.session_state.card_ids.remove(cid)
                         st.rerun()
-            
-            st.markdown("</div>", unsafe_allow_html=True)
         
         st.write("")
         
