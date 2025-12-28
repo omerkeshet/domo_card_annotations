@@ -7,8 +7,8 @@ Configured for Streamlit Cloud deployment.
 import streamlit as st
 import requests
 import pandas as pd
-from typing import Any, Dict, List
-from datetime import datetime, date
+from typing import Any, Dict, List, Optional
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -24,7 +24,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS matching View Reports Processor design
+# Custom CSS
 st.markdown("""
 <style>
     /* Hide Streamlit chrome */
@@ -112,21 +112,25 @@ st.markdown("""
         border-color: rgba(49, 51, 63, 0.3);
     }
 
-    /* Status chip */
-    .chip {
-        display: inline-block;
-        padding: 6px 10px;
-        border-radius: 999px;
-        border: 1px solid rgba(49,51,63,0.16);
-        background: rgba(255,255,255,0.70);
+    /* Card ID tags */
+    .card-tag {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        color: #15803d;
+        padding: 4px 10px;
+        border-radius: 20px;
         font-size: 0.85rem;
-        font-weight: 750;
+        font-weight: 600;
+        margin: 4px 4px 4px 0;
     }
     
-    .chip-success {
-        background: rgba(34,197,94,0.12);
-        border-color: rgba(34,197,94,0.3);
-        color: #15803d;
+    .card-tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        margin-top: 8px;
+        min-height: 20px;
     }
 
     /* Form styling */
@@ -170,13 +174,6 @@ st.markdown("""
         overflow: hidden;
     }
 
-    /* Divider */
-    hr {
-        border: none;
-        border-top: 1px solid rgba(49, 51, 63, 0.1);
-        margin: 1.5rem 0;
-    }
-
     /* Empty state */
     .empty-state {
         text-align: center;
@@ -208,20 +205,6 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.05em;
         margin-top: 0.25rem;
-    }
-
-    /* Card info header */
-    .card-title {
-        font-size: 1.15rem;
-        font-weight: 700;
-        color: #111827;
-        margin: 0;
-    }
-    
-    .card-id {
-        font-size: 0.82rem;
-        color: rgba(49, 51, 63, 0.6);
-        font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
     }
 
     /* Footer */
@@ -266,9 +249,11 @@ ANNOTATION_COLORS = {
     "Purple": "#9B5EE3",
 }
 
+COLOR_NAME_MAP = {v: k for k, v in ANNOTATION_COLORS.items()}
+
 
 # ==========================
-# API FUNCTIONS
+# DOMO API FUNCTIONS
 # ==========================
 def product_headers(token: str) -> Dict[str, str]:
     return {
@@ -400,14 +385,61 @@ def save_card_definition(
     return r.json() if r.text else {"status": "success"}
 
 
-def get_annotations(card_def: Dict[str, Any]) -> List[Dict[str, Any]]:
+def get_domo_annotations(card_def: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Extract annotations from card definition."""
     return card_def.get("definition", {}).get("annotations", [])
 
 
-def get_card_title(card_def: Dict[str, Any]) -> str:
-    """Get the card title."""
-    return card_def.get("definition", {}).get("title", "Untitled Card")
+def add_annotation_to_domo(card_id: str, content: str, entry_date: str, color: str) -> Optional[Dict[str, Any]]:
+    """Add annotation to a Domo card and return the created annotation."""
+    try:
+        card_def = fetch_kpi_definition(DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id)
+        
+        new_annotation = {
+            "content": content,
+            "dataPoint": {"point1": entry_date},
+            "color": color,
+        }
+        
+        save_card_definition(
+            DOMO_INSTANCE,
+            DOMO_DEVELOPER_TOKEN,
+            card_id,
+            card_def,
+            new_annotations=[new_annotation]
+        )
+        
+        # Refresh to get the new annotation with its ID
+        updated_card_def = fetch_kpi_definition(DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id)
+        annotations = get_domo_annotations(updated_card_def)
+        
+        # Find the newly created annotation
+        for ann in sorted(annotations, key=lambda x: x.get("createdDate", 0), reverse=True):
+            if ann.get("content") == content and ann.get("dataPoint", {}).get("point1") == entry_date:
+                return ann
+        
+        return None
+    except Exception as e:
+        st.error(f"Error adding to Domo card {card_id}: {str(e)}")
+        return None
+
+
+def delete_annotation_from_domo(card_id: str, annotation_id: int) -> bool:
+    """Delete annotation from a Domo card."""
+    try:
+        card_def = fetch_kpi_definition(DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id)
+        
+        save_card_definition(
+            DOMO_INSTANCE,
+            DOMO_DEVELOPER_TOKEN,
+            card_id,
+            card_def,
+            deleted_annotation_ids=[annotation_id]
+        )
+        return True
+    except Exception as e:
+        st.error(f"Error deleting from Domo card {card_id}: {str(e)}")
+        return False
 
 
 # ==========================
@@ -415,10 +447,8 @@ def get_card_title(card_def: Dict[str, Any]) -> str:
 # ==========================
 def get_snowflake_connection():
     """Create a Snowflake connection using private key authentication."""
-    # Parse the private key from PEM string
     private_key_pem = SNOWFLAKE_CONFIG["private_key"]
     
-    # Handle the private key format (replace literal \n with actual newlines if needed)
     if "\\n" in private_key_pem:
         private_key_pem = private_key_pem.replace("\\n", "\n")
     
@@ -446,14 +476,62 @@ def get_snowflake_connection():
     return conn
 
 
+def get_snowflake_annotations(
+    start_date: Optional[str] = None, 
+    end_date: Optional[str] = None,
+    card_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """Get annotations from Snowflake with optional filters."""
+    try:
+        conn = get_snowflake_connection()
+        cursor = conn.cursor()
+        
+        select_sql = f"""
+            SELECT ID, CARD_ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE
+            FROM {SNOWFLAKE_TABLE}
+            WHERE 1=1
+        """
+        params = []
+        
+        if start_date:
+            select_sql += " AND ENTRY_DATE >= %s"
+            params.append(start_date)
+        
+        if end_date:
+            select_sql += " AND ENTRY_DATE <= %s"
+            params.append(end_date)
+        
+        if card_id:
+            select_sql += " AND CARD_ID = %s"
+            params.append(int(card_id))
+        
+        select_sql += " ORDER BY ENTRY_DATE DESC"
+        
+        cursor.execute(select_sql, params)
+        
+        rows = cursor.fetchall()
+        columns = ["ID", "CARD_ID", "DOMO_USER_ID", "DOMO_USER_NAME", "COLOR", "CONTENT", "ENTRY_DATE"]
+        
+        results = []
+        for row in rows:
+            results.append(dict(zip(columns, row)))
+        
+        cursor.close()
+        conn.close()
+        return results
+    except Exception as e:
+        st.error(f"Snowflake query error: {str(e)}")
+        return []
+
+
 def insert_annotation_to_snowflake(
-    card_id: str,
-    annotation_id: int,
-    user_id: int,
-    user_name: str,
-    color: str,
     content: str,
-    entry_date: str
+    entry_date: str,
+    color: str,
+    card_id: Optional[int] = None,
+    annotation_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    user_name: Optional[str] = None
 ) -> bool:
     """Insert a new annotation record into Snowflake."""
     try:
@@ -467,7 +545,7 @@ def insert_annotation_to_snowflake(
         """
         
         cursor.execute(insert_sql, (
-            int(card_id),
+            card_id,
             annotation_id,
             user_id,
             user_name,
@@ -485,14 +563,19 @@ def insert_annotation_to_snowflake(
         return False
 
 
-def delete_annotation_from_snowflake(annotation_id: int) -> bool:
+def delete_annotation_from_snowflake(annotation_id: Optional[int] = None, card_id: Optional[int] = None, content: Optional[str] = None, entry_date: Optional[str] = None) -> bool:
     """Delete an annotation record from Snowflake."""
     try:
         conn = get_snowflake_connection()
         cursor = conn.cursor()
         
-        delete_sql = f"DELETE FROM {SNOWFLAKE_TABLE} WHERE ID = %s"
-        cursor.execute(delete_sql, (annotation_id,))
+        if annotation_id:
+            delete_sql = f"DELETE FROM {SNOWFLAKE_TABLE} WHERE ID = %s"
+            cursor.execute(delete_sql, (annotation_id,))
+        elif content and entry_date:
+            # For global annotations (no ID), delete by content and date
+            delete_sql = f"DELETE FROM {SNOWFLAKE_TABLE} WHERE CONTENT = %s AND ENTRY_DATE = %s AND ID IS NULL"
+            cursor.execute(delete_sql, (content, entry_date))
         
         conn.commit()
         cursor.close()
@@ -503,53 +586,28 @@ def delete_annotation_from_snowflake(annotation_id: int) -> bool:
         return False
 
 
-def get_snowflake_annotations(card_id: str) -> List[Dict[str, Any]]:
-    """Get all annotations for a card from Snowflake."""
-    try:
-        conn = get_snowflake_connection()
-        cursor = conn.cursor()
-        
-        select_sql = f"""
-            SELECT ID, CARD_ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE
-            FROM {SNOWFLAKE_TABLE}
-            WHERE CARD_ID = %s
-        """
-        cursor.execute(select_sql, (int(card_id),))
-        
-        rows = cursor.fetchall()
-        columns = ["ID", "CARD_ID", "DOMO_USER_ID", "DOMO_USER_NAME", "COLOR", "CONTENT", "ENTRY_DATE"]
-        
-        results = []
-        for row in rows:
-            results.append(dict(zip(columns, row)))
-        
-        cursor.close()
-        conn.close()
-        return results
-    except Exception as e:
-        st.error(f"Snowflake query error: {str(e)}")
-        return []
-
-
-def sync_card_annotations_to_snowflake(card_id: str, domo_annotations: List[Dict[str, Any]]) -> Dict[str, int]:
+def sync_card_annotations(card_id: str) -> Dict[str, int]:
     """
-    Sync all annotations for a card from Domo to Snowflake.
-    Returns counts of inserted, updated, and deleted records.
+    Bidirectional sync between Domo and Snowflake for a specific card.
+    Only syncs annotations with CARD_ID and ID (not global ones).
     """
-    results = {"inserted": 0, "updated": 0, "deleted": 0, "unchanged": 0}
+    results = {"to_snowflake": 0, "to_domo": 0, "updated": 0, "deleted_sf": 0, "deleted_domo": 0}
     
     try:
-        # Get current Snowflake annotations for this card
-        sf_annotations = get_snowflake_annotations(card_id)
-        sf_by_id = {ann["ID"]: ann for ann in sf_annotations}
-        
-        # Get Domo annotation IDs
+        # Get Domo annotations
+        card_def = fetch_kpi_definition(DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id)
+        domo_annotations = get_domo_annotations(card_def)
         domo_by_id = {ann.get("id"): ann for ann in domo_annotations}
+        
+        # Get Snowflake annotations for this card (only those with ID)
+        sf_annotations = get_snowflake_annotations(card_id=card_id)
+        sf_with_id = [ann for ann in sf_annotations if ann.get("ID") is not None]
+        sf_by_id = {ann["ID"]: ann for ann in sf_with_id}
         
         conn = get_snowflake_connection()
         cursor = conn.cursor()
         
-        # Process Domo annotations (INSERT or UPDATE)
+        # Domo → Snowflake: Add/Update
         for ann_id, ann in domo_by_id.items():
             entry_date = ann.get("dataPoint", {}).get("point1", "")
             content = ann.get("content", "")
@@ -560,10 +618,7 @@ def sync_card_annotations_to_snowflake(card_id: str, domo_annotations: List[Dict
             if ann_id in sf_by_id:
                 # Check if update needed
                 sf_ann = sf_by_id[ann_id]
-                if (sf_ann["CONTENT"] != content or 
-                    sf_ann["COLOR"] != color or 
-                    str(sf_ann["ENTRY_DATE"]) != entry_date):
-                    # UPDATE
+                if (sf_ann["CONTENT"] != content or sf_ann["COLOR"] != color):
                     update_sql = f"""
                         UPDATE {SNOWFLAKE_TABLE}
                         SET CONTENT = %s, COLOR = %s, ENTRY_DATE = %s,
@@ -572,24 +627,24 @@ def sync_card_annotations_to_snowflake(card_id: str, domo_annotations: List[Dict
                     """
                     cursor.execute(update_sql, (content, color, entry_date, user_id, user_name, ann_id))
                     results["updated"] += 1
-                else:
-                    results["unchanged"] += 1
             else:
-                # INSERT
+                # Insert to Snowflake
                 insert_sql = f"""
                     INSERT INTO {SNOWFLAKE_TABLE} 
                     (CARD_ID, ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """
                 cursor.execute(insert_sql, (int(card_id), ann_id, user_id, user_name, color, content, entry_date))
-                results["inserted"] += 1
+                results["to_snowflake"] += 1
         
-        # Delete annotations that exist in Snowflake but not in Domo
-        for sf_id in sf_by_id.keys():
+        # Snowflake → Domo: Add missing (only if has ID but not in Domo - means deleted from Domo)
+        # Actually, if it's in Snowflake with ID but not in Domo, it was deleted from Domo
+        # So we should delete from Snowflake
+        for sf_id, sf_ann in sf_by_id.items():
             if sf_id not in domo_by_id:
                 delete_sql = f"DELETE FROM {SNOWFLAKE_TABLE} WHERE ID = %s"
                 cursor.execute(delete_sql, (sf_id,))
-                results["deleted"] += 1
+                results["deleted_sf"] += 1
         
         conn.commit()
         cursor.close()
@@ -597,8 +652,15 @@ def sync_card_annotations_to_snowflake(card_id: str, domo_annotations: List[Dict
         
         return results
     except Exception as e:
-        st.error(f"Snowflake sync error: {str(e)}")
+        st.error(f"Sync error: {str(e)}")
         return results
+
+
+# ==========================
+# SESSION STATE INIT
+# ==========================
+if "card_ids" not in st.session_state:
+    st.session_state.card_ids = []
 
 
 # ==========================
@@ -608,379 +670,340 @@ def sync_card_annotations_to_snowflake(card_id: str, domo_annotations: List[Dict
 # Header
 st.title("Annotations Manager")
 st.markdown(
-    "<div class='muted'>Add and delete annotations on Domo cards. "
-    "Enter a card ID to get started.</div>",
+    "<div class='muted'>Create and manage annotations. Optionally add to Domo cards.</div>",
     unsafe_allow_html=True,
 )
 
 st.write("")
 
-# Card Loader Section
-if "card_def" not in st.session_state:
+# Two column layout for Add and Delete
+col_add, col_delete = st.columns(2, gap="medium")
+
+# ==========================
+# ADD ANNOTATION
+# ==========================
+with col_add:
     with st.container(border=True):
-        st.markdown("<div class='label'>Load Card</div>", unsafe_allow_html=True)
+        st.markdown("<div class='label'>Add Annotation</div>", unsafe_allow_html=True)
         st.markdown(
-            "<div class='desc'>Enter the Domo card ID to load its annotations.</div>",
+            "<div class='desc'>Create a new annotation. Optionally add to Domo cards.</div>",
             unsafe_allow_html=True,
         )
         
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            card_id = st.text_input(
-                "Card ID",
-                placeholder="e.g., 19344562",
+        annotation_text = st.text_area(
+            "Content",
+            placeholder="Enter annotation text...",
+            height=80,
+            key="add_content"
+        )
+        
+        col_date, col_color = st.columns(2)
+        with col_date:
+            st.markdown("<div class='tiny'>Date</div>", unsafe_allow_html=True)
+            annotation_date = st.date_input("Date", value=date.today(), label_visibility="collapsed", key="add_date")
+        with col_color:
+            st.markdown("<div class='tiny'>Color</div>", unsafe_allow_html=True)
+            color_name = st.selectbox("Color", options=list(ANNOTATION_COLORS.keys()), label_visibility="collapsed", key="add_color")
+        
+        # Card IDs section
+        st.markdown("<div class='tiny'>Card IDs (optional)</div>", unsafe_allow_html=True)
+        
+        col_input, col_btn = st.columns([3, 1])
+        with col_input:
+            new_card_id = st.text_input("Card ID", placeholder="Enter card ID...", label_visibility="collapsed", key="new_card_id")
+        with col_btn:
+            if st.button("+ Add", type="secondary", use_container_width=True):
+                if new_card_id and new_card_id.strip():
+                    card_id_clean = new_card_id.strip()
+                    if card_id_clean not in st.session_state.card_ids:
+                        st.session_state.card_ids.append(card_id_clean)
+                        st.rerun()
+        
+        # Display card ID tags
+        if st.session_state.card_ids:
+            tags_html = '<div class="card-tags-container">'
+            for cid in st.session_state.card_ids:
+                tags_html += f'<span class="card-tag">{cid}</span>'
+            tags_html += '</div>'
+            st.markdown(tags_html, unsafe_allow_html=True)
+            
+            # Remove buttons
+            cols = st.columns(len(st.session_state.card_ids))
+            for i, cid in enumerate(st.session_state.card_ids):
+                with cols[i]:
+                    if st.button(f"✕ {cid}", key=f"remove_{cid}", type="secondary"):
+                        st.session_state.card_ids.remove(cid)
+                        st.rerun()
+        
+        st.write("")
+        
+        if st.button("Add Annotation", type="primary", use_container_width=True):
+            if not annotation_text:
+                st.error("Please enter annotation text")
+            else:
+                with st.spinner("Adding annotation..."):
+                    entry_date_str = annotation_date.strftime("%Y-%m-%d")
+                    color_hex = ANNOTATION_COLORS[color_name]
+                    
+                    if st.session_state.card_ids:
+                        # Add to Domo cards + Snowflake
+                        success_cards = []
+                        for cid in st.session_state.card_ids:
+                            domo_ann = add_annotation_to_domo(cid, annotation_text, entry_date_str, color_hex)
+                            if domo_ann:
+                                # Insert to Snowflake with card ID and annotation ID
+                                sf_success = insert_annotation_to_snowflake(
+                                    content=annotation_text,
+                                    entry_date=entry_date_str,
+                                    color=color_hex,
+                                    card_id=int(cid),
+                                    annotation_id=domo_ann.get("id"),
+                                    user_id=domo_ann.get("userId"),
+                                    user_name=domo_ann.get("userName")
+                                )
+                                if sf_success:
+                                    success_cards.append(cid)
+                        
+                        if success_cards:
+                            st.success(f"Annotation added to cards: {', '.join(success_cards)}")
+                            st.session_state.card_ids = []
+                            st.rerun()
+                    else:
+                        # Snowflake only (global annotation)
+                        sf_success = insert_annotation_to_snowflake(
+                            content=annotation_text,
+                            entry_date=entry_date_str,
+                            color=color_hex
+                        )
+                        if sf_success:
+                            st.success("Global annotation added to Snowflake!")
+                            st.rerun()
+
+# ==========================
+# DELETE ANNOTATION
+# ==========================
+with col_delete:
+    with st.container(border=True):
+        st.markdown("<div class='label'>Delete Annotation</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='desc'>Filter by date range and select annotation to delete.</div>",
+            unsafe_allow_html=True,
+        )
+        
+        # Date range filter
+        col_start, col_end = st.columns(2)
+        with col_start:
+            st.markdown("<div class='tiny'>From Date</div>", unsafe_allow_html=True)
+            start_date = st.date_input("Start", value=date.today() - timedelta(days=30), label_visibility="collapsed", key="del_start")
+        with col_end:
+            st.markdown("<div class='tiny'>To Date</div>", unsafe_allow_html=True)
+            end_date = st.date_input("End", value=date.today(), label_visibility="collapsed", key="del_end")
+        
+        # Load annotations button
+        if st.button("Load Annotations", type="secondary", use_container_width=True):
+            st.session_state.delete_annotations = get_snowflake_annotations(
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d")
+            )
+        
+        # Show annotations dropdown
+        if "delete_annotations" in st.session_state and st.session_state.delete_annotations:
+            annotations = st.session_state.delete_annotations
+            
+            annotation_options = {}
+            sorted_annotations = sorted(annotations, key=lambda x: str(x.get("ENTRY_DATE", "")), reverse=True)
+            for ann in sorted_annotations:
+                content_preview = str(ann['CONTENT'])[:30] + ('...' if len(str(ann['CONTENT'])) > 30 else '')
+                date_str = str(ann.get('ENTRY_DATE', 'N/A'))
+                card_str = f"Card {ann['CARD_ID']}" if ann.get('CARD_ID') else "Global"
+                label = f"{content_preview} • {date_str} • {card_str}"
+                annotation_options[label] = ann
+            
+            selected_label = st.selectbox(
+                "Select annotation",
+                options=list(annotation_options.keys()),
                 label_visibility="collapsed"
             )
-        with col2:
-            load_button = st.button("Load", type="primary", use_container_width=True)
-        
-        if load_button:
-            if not card_id:
-                st.error("Please enter a Card ID")
-            else:
-                with st.spinner("Loading card..."):
-                    try:
-                        card_def = fetch_kpi_definition(DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id)
-                        st.session_state.card_def = card_def
-                        st.session_state.card_id = card_id
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error loading card: {str(e)}")
-
-    st.write("")
-    st.info("Enter a card ID above to manage its annotations.")
-
-# Main Interface (when card is loaded)
-if "card_def" in st.session_state and "card_id" in st.session_state:
-    card_def = st.session_state.card_def
-    card_id = st.session_state.card_id
-    annotations = get_annotations(card_def)
-    
-    # Card Info Header
-    with st.container(border=True):
-        col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
-        
-        with col1:
-            st.markdown(f"<div class='label'>Loaded Card</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='card-title'>{get_card_title(card_def)}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='card-id'>ID: {card_id}</div>", unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("<div class='stat-box'>", unsafe_allow_html=True)
-            st.markdown(f"<div class='stat-value'>{len(annotations)}</div>", unsafe_allow_html=True)
-            st.markdown("<div class='stat-label'>Annotations</div>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        
-        with col3:
-            st.write("")
-            if st.button("⇄ Sync", type="secondary", use_container_width=True, help="Sync annotations to Snowflake"):
-                with st.spinner("Syncing to Snowflake..."):
-                    sync_results = sync_card_annotations_to_snowflake(card_id, annotations)
-                    st.success(
-                        f"Sync complete! Inserted: {sync_results['inserted']}, "
-                        f"Updated: {sync_results['updated']}, "
-                        f"Deleted: {sync_results['deleted']}, "
-                        f"Unchanged: {sync_results['unchanged']}"
-                    )
-        
-        with col4:
-            st.write("")
-            if st.button("✕ Close", type="secondary", use_container_width=True):
-                del st.session_state.card_def
-                del st.session_state.card_id
-                st.rerun()
-    
-    st.write("")
-    
-    # Two column layout for Add and Delete
-    col_add, col_delete = st.columns(2, gap="medium")
-    
-    # ADD ANNOTATION
-    with col_add:
-        with st.container(border=True):
-            st.markdown("<div class='label'>Add Annotation</div>", unsafe_allow_html=True)
-            st.markdown(
-                "<div class='desc'>Create a new annotation on this card.</div>",
-                unsafe_allow_html=True,
-            )
             
-            with st.form("add_form", clear_on_submit=True):
-                annotation_text = st.text_area(
-                    "Text",
-                    placeholder="Enter annotation text...",
-                    height=80,
-                    label_visibility="collapsed"
-                )
-                
-                col_date, col_color = st.columns(2)
-                with col_date:
-                    st.markdown("<div class='tiny'>Date</div>", unsafe_allow_html=True)
-                    annotation_date = st.date_input("Date", value=date.today(), label_visibility="collapsed")
-                with col_color:
-                    st.markdown("<div class='tiny'>Color</div>", unsafe_allow_html=True)
-                    color_name = st.selectbox("Color", options=list(ANNOTATION_COLORS.keys()), label_visibility="collapsed")
-                
-                submitted = st.form_submit_button("Add Annotation", type="primary", use_container_width=True)
-                
-                if submitted:
-                    if not annotation_text:
-                        st.error("Please enter annotation text")
+            st.write("")
+            
+            if st.button("Delete Selected", type="secondary", use_container_width=True):
+                selected_ann = annotation_options[selected_label]
+                with st.spinner("Deleting..."):
+                    # Delete from Snowflake
+                    if selected_ann.get("ID"):
+                        sf_success = delete_annotation_from_snowflake(annotation_id=selected_ann["ID"])
+                        
+                        # If has card ID, also delete from Domo
+                        if selected_ann.get("CARD_ID") and sf_success:
+                            delete_annotation_from_domo(str(selected_ann["CARD_ID"]), selected_ann["ID"])
                     else:
-                        with st.spinner("Adding..."):
-                            try:
-                                new_annotation = {
-                                    "content": annotation_text,
-                                    "dataPoint": {"point1": annotation_date.strftime("%Y-%m-%d")},
-                                    "color": ANNOTATION_COLORS[color_name],
-                                }
-                                
-                                # Save to Domo
-                                save_card_definition(
-                                    DOMO_INSTANCE, 
-                                    DOMO_DEVELOPER_TOKEN, 
-                                    card_id, 
-                                    card_def,
-                                    new_annotations=[new_annotation]
-                                )
-                                
-                                # Refresh to get the new annotation with its ID
-                                st.session_state.card_def = fetch_kpi_definition(
-                                    DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id
-                                )
-                                
-                                # Find the newly created annotation (most recent one with matching content)
-                                new_annotations = get_annotations(st.session_state.card_def)
-                                new_ann = None
-                                for ann in sorted(new_annotations, key=lambda x: x.get("createdDate", 0), reverse=True):
-                                    if ann.get("content") == annotation_text:
-                                        new_ann = ann
-                                        break
-                                
-                                # Sync to Snowflake
-                                if new_ann:
-                                    sf_success = insert_annotation_to_snowflake(
-                                        card_id=card_id,
-                                        annotation_id=new_ann.get("id"),
-                                        user_id=new_ann.get("userId", 0),
-                                        user_name=new_ann.get("userName", "Unknown"),
-                                        color=ANNOTATION_COLORS[color_name],
-                                        content=annotation_text,
-                                        entry_date=annotation_date.strftime("%Y-%m-%d")
-                                    )
-                                    if sf_success:
-                                        st.success("Annotation added & synced to Snowflake!")
-                                    else:
-                                        st.warning("Annotation added to Domo, but Snowflake sync failed.")
-                                else:
-                                    st.success("Annotation added!")
-                                
-                                st.rerun()
-                                
-                            except Exception as e:
-                                st.error(f"Error: {str(e)}")
-    
-    # DELETE ANNOTATION
-    with col_delete:
-        with st.container(border=True):
-            st.markdown("<div class='label'>Delete Annotation</div>", unsafe_allow_html=True)
-            st.markdown(
-                "<div class='desc'>Remove an existing annotation.</div>",
-                unsafe_allow_html=True,
-            )
-            
-            if annotations:
-                annotation_options = {}
-                sorted_annotations = sorted(annotations, key=lambda x: x.get("createdDate", 0), reverse=True)
-                for ann in sorted_annotations:
-                    content_preview = ann['content'][:35] + ('...' if len(ann['content']) > 35 else '')
-                    date_str = ann['dataPoint'].get('point1', 'N/A')
-                    label = f"{content_preview} • {date_str}"
-                    annotation_options[label] = ann['id']
-                
-                selected = st.selectbox(
-                    "Select annotation",
-                    options=list(annotation_options.keys()),
-                    label_visibility="collapsed"
-                )
-                
-                st.write("")
-                
-                if st.button("Delete Selected", type="secondary", use_container_width=True):
-                    annotation_id = annotation_options[selected]
-                    with st.spinner("Deleting..."):
-                        try:
-                            # Delete from Domo
-                            save_card_definition(
-                                DOMO_INSTANCE, 
-                                DOMO_DEVELOPER_TOKEN, 
-                                card_id, 
-                                card_def,
-                                deleted_annotation_ids=[annotation_id]
-                            )
-                            
-                            # Delete from Snowflake
-                            sf_success = delete_annotation_from_snowflake(annotation_id)
-                            
-                            st.session_state.card_def = fetch_kpi_definition(
-                                DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id
-                            )
-                            
-                            if sf_success:
-                                st.success("Annotation deleted & removed from Snowflake!")
-                            else:
-                                st.warning("Annotation deleted from Domo, but Snowflake sync failed.")
-                            
-                            st.rerun()
-                            
-                        except Exception as e:
-                            st.error(f"Error: {str(e)}")
-            else:
-                st.markdown("""
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📝</div>
-                        <p>No annotations to delete</p>
-                    </div>
-                """, unsafe_allow_html=True)
-    
-    st.write("")
-    
-    # ANNOTATIONS TABLE/TIMELINE
-    with st.container(border=True):
-        col_header, col_toggle, col_refresh = st.columns([3, 1.5, 1])
-        with col_header:
-            st.markdown("<div class='label'>All Annotations</div>", unsafe_allow_html=True)
-            st.markdown(
-                f"<div class='desc'>Showing {len(annotations)} annotation{'s' if len(annotations) != 1 else ''} on this card.</div>",
-                unsafe_allow_html=True,
-            )
-        with col_toggle:
-            view_mode = st.toggle("Timeline View", value=False)
-        with col_refresh:
-            if st.button("↻ Refresh", type="secondary", use_container_width=True):
-                with st.spinner(""):
-                    st.session_state.card_def = fetch_kpi_definition(
-                        DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id
-                    )
-                    st.rerun()
-        
-        annotations = get_annotations(st.session_state.card_def)
-        
-        if annotations:
-            if view_mode:
-                # Timeline View
-                import plotly.express as px
-                import plotly.graph_objects as go
-                
-                # Prepare data for timeline
-                timeline_data = []
-                for ann in annotations:
-                    date_str = ann.get("dataPoint", {}).get("point1", None)
-                    if date_str:
-                        timeline_data.append({
-                            "Date": date_str,
-                            "Content": ann.get("content", ""),
-                            "Color": ann.get("color", "#72B0D7"),
-                            "Created By": ann.get("userName", "Unknown"),
-                        })
-                
-                if timeline_data:
-                    df_timeline = pd.DataFrame(timeline_data)
-                    df_timeline["Date"] = pd.to_datetime(df_timeline["Date"])
-                    df_timeline = df_timeline.sort_values("Date")
-                    
-                    # Create timeline chart
-                    fig = go.Figure()
-                    
-                    # Add scatter points for each annotation
-                    for idx, row in df_timeline.iterrows():
-                        fig.add_trace(go.Scatter(
-                            x=[row["Date"]],
-                            y=[0],
-                            mode="markers+text",
-                            marker=dict(
-                                size=16,
-                                color=row["Color"],
-                                line=dict(width=2, color="white")
-                            ),
-                            text=[row["Content"][:30] + "..." if len(row["Content"]) > 30 else row["Content"]],
-                            textposition="top center",
-                            hovertemplate=(
-                                f"<b>{row['Content']}</b><br>"
-                                f"Date: {row['Date'].strftime('%Y-%m-%d')}<br>"
-                                f"By: {row['Created By']}<extra></extra>"
-                            ),
-                            showlegend=False
-                        ))
-                    
-                    # Update layout
-                    fig.update_layout(
-                        height=300,
-                        margin=dict(l=20, r=20, t=40, b=20),
-                        xaxis=dict(
-                            title="",
-                            showgrid=True,
-                            gridcolor="rgba(0,0,0,0.05)",
-                        ),
-                        yaxis=dict(
-                            visible=False,
-                            range=[-0.5, 1]
-                        ),
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        hoverlabel=dict(
-                            bgcolor="white",
-                            font_size=13,
-                            font_family="Inter"
+                        # Global annotation - delete by content and date
+                        sf_success = delete_annotation_from_snowflake(
+                            content=selected_ann["CONTENT"],
+                            entry_date=str(selected_ann["ENTRY_DATE"])
                         )
-                    )
                     
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.markdown("""
-                        <div class="empty-state">
-                            <div class="empty-state-icon">📅</div>
-                            <p>No annotations with valid dates</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-            else:
-                # Table View
-                df_data = []
-                for ann in annotations:
-                    created_ts = ann.get("createdDate", 0)
-                    created_str = datetime.fromtimestamp(created_ts / 1000).strftime("%Y-%m-%d %H:%M") if created_ts else "—"
-                    
-                    df_data.append({
-                        "Content": ann.get("content"),
-                        "Date": ann.get("dataPoint", {}).get("point1", "—"),
-                        "Color": ann.get("color", "—"),
-                        "Created By": ann.get("userName", "—"),
-                        "Created": created_str,
-                        "ID": ann.get("id"),
-                    })
-                
-                df = pd.DataFrame(df_data)
-                df = df.sort_values("Created", ascending=False)
-                
-                st.dataframe(
-                    df,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Content": st.column_config.TextColumn("Content", width="large"),
-                        "Date": st.column_config.TextColumn("Date", width="small"),
-                        "Color": st.column_config.TextColumn("Color", width="small"),
-                        "Created By": st.column_config.TextColumn("Created By", width="medium"),
-                        "Created": st.column_config.TextColumn("Created", width="medium"),
-                        "ID": st.column_config.NumberColumn("ID", width="small", format="%d"),
-                    }
-                )
-        else:
+                    if sf_success:
+                        st.success("Annotation deleted!")
+                        # Refresh the list
+                        st.session_state.delete_annotations = get_snowflake_annotations(
+                            start_date=start_date.strftime("%Y-%m-%d"),
+                            end_date=end_date.strftime("%Y-%m-%d")
+                        )
+                        st.rerun()
+        elif "delete_annotations" in st.session_state:
             st.markdown("""
                 <div class="empty-state">
-                    <div class="empty-state-icon">📊</div>
-                    <p>No annotations on this card yet</p>
+                    <div class="empty-state-icon">📝</div>
+                    <p>No annotations in this date range</p>
                 </div>
             """, unsafe_allow_html=True)
+
+st.write("")
+
+# ==========================
+# SYNC SECTION
+# ==========================
+with st.container(border=True):
+    st.markdown("<div class='label'>Sync Card</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='desc'>Sync annotations between Domo and Snowflake for a specific card.</div>",
+        unsafe_allow_html=True,
+    )
+    
+    col_sync_input, col_sync_btn = st.columns([3, 1])
+    with col_sync_input:
+        sync_card_id = st.text_input("Card ID to sync", placeholder="Enter card ID...", label_visibility="collapsed", key="sync_card_id")
+    with col_sync_btn:
+        if st.button("⇄ Sync", type="primary", use_container_width=True):
+            if sync_card_id:
+                with st.spinner("Syncing..."):
+                    results = sync_card_annotations(sync_card_id)
+                    st.success(
+                        f"Sync complete! Added to SF: {results['to_snowflake']}, "
+                        f"Updated: {results['updated']}, "
+                        f"Deleted from SF: {results['deleted_sf']}"
+                    )
+            else:
+                st.error("Please enter a card ID")
+
+st.write("")
+
+# ==========================
+# VIEW ALL ANNOTATIONS
+# ==========================
+with st.container(border=True):
+    col_header, col_toggle, col_refresh = st.columns([3, 1.5, 1])
+    with col_header:
+        st.markdown("<div class='label'>All Annotations</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='desc'>View all annotations from Snowflake.</div>",
+            unsafe_allow_html=True,
+        )
+    with col_toggle:
+        view_mode = st.toggle("Timeline View", value=False)
+    with col_refresh:
+        if st.button("↻ Refresh", type="secondary", use_container_width=True, key="refresh_all"):
+            st.session_state.all_annotations = get_snowflake_annotations()
+            st.rerun()
+    
+    # Load annotations if not loaded
+    if "all_annotations" not in st.session_state:
+        st.session_state.all_annotations = get_snowflake_annotations()
+    
+    annotations = st.session_state.all_annotations
+    
+    if annotations:
+        if view_mode:
+            # Timeline View
+            import plotly.graph_objects as go
+            
+            timeline_data = []
+            for ann in annotations:
+                date_str = ann.get("ENTRY_DATE")
+                if date_str:
+                    timeline_data.append({
+                        "Date": str(date_str),
+                        "Content": ann.get("CONTENT", ""),
+                        "Color": ann.get("COLOR", "#72B0D7"),
+                        "Card": f"Card {ann['CARD_ID']}" if ann.get("CARD_ID") else "Global",
+                    })
+            
+            if timeline_data:
+                df_timeline = pd.DataFrame(timeline_data)
+                df_timeline["Date"] = pd.to_datetime(df_timeline["Date"])
+                df_timeline = df_timeline.sort_values("Date")
+                
+                fig = go.Figure()
+                
+                for idx, row in df_timeline.iterrows():
+                    fig.add_trace(go.Scatter(
+                        x=[row["Date"]],
+                        y=[0],
+                        mode="markers+text",
+                        marker=dict(
+                            size=16,
+                            color=row["Color"],
+                            line=dict(width=2, color="white")
+                        ),
+                        text=[row["Content"][:20] + "..." if len(row["Content"]) > 20 else row["Content"]],
+                        textposition="top center",
+                        hovertemplate=(
+                            f"<b>{row['Content']}</b><br>"
+                            f"Date: {row['Date'].strftime('%Y-%m-%d')}<br>"
+                            f"{row['Card']}<extra></extra>"
+                        ),
+                        showlegend=False
+                    ))
+                
+                fig.update_layout(
+                    height=300,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    xaxis=dict(title="", showgrid=True, gridcolor="rgba(0,0,0,0.05)"),
+                    yaxis=dict(visible=False, range=[-0.5, 1]),
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    hoverlabel=dict(bgcolor="white", font_size=13, font_family="Inter")
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            # Table View
+            df_data = []
+            for ann in annotations:
+                df_data.append({
+                    "Content": ann.get("CONTENT"),
+                    "Date": str(ann.get("ENTRY_DATE", "—")),
+                    "Color": COLOR_NAME_MAP.get(ann.get("COLOR"), ann.get("COLOR", "—")),
+                    "Card ID": ann.get("CARD_ID") if ann.get("CARD_ID") else "Global",
+                    "Created By": ann.get("DOMO_USER_NAME", "—"),
+                    "ID": ann.get("ID") if ann.get("ID") else "—",
+                })
+            
+            df = pd.DataFrame(df_data)
+            df = df.sort_values("Date", ascending=False)
+            
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Content": st.column_config.TextColumn("Content", width="large"),
+                    "Date": st.column_config.TextColumn("Date", width="small"),
+                    "Color": st.column_config.TextColumn("Color", width="small"),
+                    "Card ID": st.column_config.TextColumn("Card ID", width="small"),
+                    "Created By": st.column_config.TextColumn("Created By", width="medium"),
+                    "ID": st.column_config.TextColumn("ID", width="small"),
+                }
+            )
+    else:
+        st.markdown("""
+            <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <p>No annotations found</p>
+            </div>
+        """, unsafe_allow_html=True)
 
 # Footer
 st.markdown(
