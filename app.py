@@ -236,18 +236,6 @@ st.markdown("""
         pointer-events: none;
         letter-spacing: 0.02em;
     }
-
-    /* Multiselect tags - light blue instead of red */
-    span[data-baseweb="tag"] {
-        background-color: rgba(31, 79, 216, 0.15) !important;
-    }
-    span[data-baseweb="tag"] span {
-        color: #1f4fd8 !important;
-    }
-    span[data-baseweb="tag"]:hover {
-        background-color: rgba(31, 79, 216, 0.25) !important;
-    }
-    
 </style>
 """, unsafe_allow_html=True)
 
@@ -617,10 +605,10 @@ def delete_annotation_from_snowflake(annotation_id: Optional[int] = None, card_i
 
 def sync_card_annotations(card_id: str) -> Dict[str, int]:
     """
-    Bidirectional sync between Domo and Snowflake for a specific card.
-    Only syncs annotations with CARD_ID and ID (not global ones).
+    Sync annotations from Domo to Snowflake for a specific card.
+    Only adds missing annotations, never deletes.
     """
-    results = {"to_snowflake": 0, "to_domo": 0, "updated": 0, "deleted_sf": 0, "deleted_domo": 0}
+    results = {"inserted": 0, "updated": 0, "skipped": 0}
     
     try:
         # Get Domo annotations
@@ -636,7 +624,7 @@ def sync_card_annotations(card_id: str) -> Dict[str, int]:
         conn = get_snowflake_connection()
         cursor = conn.cursor()
         
-        # Domo → Snowflake: Add/Update
+        # Domo → Snowflake: Add missing, update changed
         for ann_id, ann in domo_by_id.items():
             entry_date = ann.get("dataPoint", {}).get("point1", "")
             content = ann.get("content", "")
@@ -656,6 +644,8 @@ def sync_card_annotations(card_id: str) -> Dict[str, int]:
                     """
                     cursor.execute(update_sql, (content, color, entry_date, user_id, user_name, ann_id))
                     results["updated"] += 1
+                else:
+                    results["skipped"] += 1
             else:
                 # Insert to Snowflake
                 insert_sql = f"""
@@ -664,16 +654,7 @@ def sync_card_annotations(card_id: str) -> Dict[str, int]:
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """
                 cursor.execute(insert_sql, (int(card_id), ann_id, user_id, user_name, color, content, entry_date))
-                results["to_snowflake"] += 1
-        
-        # Snowflake → Domo: Add missing (only if has ID but not in Domo - means deleted from Domo)
-        # Actually, if it's in Snowflake with ID but not in Domo, it was deleted from Domo
-        # So we should delete from Snowflake
-        for sf_id, sf_ann in sf_by_id.items():
-            if sf_id not in domo_by_id:
-                delete_sql = f"DELETE FROM {SNOWFLAKE_TABLE} WHERE ID = %s"
-                cursor.execute(delete_sql, (sf_id,))
-                results["deleted_sf"] += 1
+                results["inserted"] += 1
         
         conn.commit()
         cursor.close()
@@ -908,9 +889,9 @@ with st.container(border=True):
                 with st.spinner("Syncing..."):
                     results = sync_card_annotations(sync_card_id)
                     st.success(
-                        f"Sync complete! Added to SF: {results['to_snowflake']}, "
+                        f"Sync complete! Inserted: {results['inserted']}, "
                         f"Updated: {results['updated']}, "
-                        f"Deleted from SF: {results['deleted_sf']}"
+                        f"Skipped: {results['skipped']}"
                     )
             else:
                 st.error("Please enter a card ID")
