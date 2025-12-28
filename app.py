@@ -236,6 +236,17 @@ st.markdown("""
         pointer-events: none;
         letter-spacing: 0.02em;
     }
+
+    /* Multiselect tags - light blue instead of red */
+    span[data-baseweb="tag"] {
+        background-color: rgba(31, 79, 216, 0.15) !important;
+    }
+    span[data-baseweb="tag"] span {
+        color: #1f4fd8 !important;
+    }
+    span[data-baseweb="tag"]:hover {
+        background-color: rgba(31, 79, 216, 0.25) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
