@@ -738,20 +738,25 @@ with col_add:
         
         # Display card ID tags with X inside
         if st.session_state.card_ids:
-            # Use fixed 4 columns max to keep buttons small
-            num_cols = min(len(st.session_state.card_ids), 4)
-            rows_needed = (len(st.session_state.card_ids) + num_cols - 1) // num_cols
+            # CSS to keep tags compact and single-line
+            st.markdown("""
+                <style>
+                    [data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"] {
+                        white-space: nowrap !important;
+                        padding: 0.25rem 0.75rem !important;
+                        font-size: 0.8rem !important;
+                        min-height: 0 !important;
+                    }
+                </style>
+            """, unsafe_allow_html=True)
             
-            for row in range(rows_needed):
-                cols = st.columns(4)
-                for col_idx in range(4):
-                    tag_idx = row * 4 + col_idx
-                    if tag_idx < len(st.session_state.card_ids):
-                        cid = st.session_state.card_ids[tag_idx]
-                        with cols[col_idx]:
-                            if st.button(f"✕ {cid}", key=f"tag_{cid}", type="secondary", use_container_width=True):
-                                st.session_state.card_ids.remove(cid)
-                                st.rerun()
+            # Display as flowing text-like elements using a single row
+            cols = st.columns(6)
+            for i, cid in enumerate(st.session_state.card_ids):
+                with cols[i % 6]:
+                    if st.button(f"✕ {cid}", key=f"tag_{cid}", type="secondary"):
+                        st.session_state.card_ids.remove(cid)
+                        st.rerun()
         
         st.write("")
         
