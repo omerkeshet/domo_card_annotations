@@ -132,6 +132,23 @@ st.markdown("""
         margin-top: 8px;
         min-height: 20px;
     }
+    
+    /* Green tag buttons (for removable card IDs) */
+    button[data-testid="stBaseButton-secondary"][kind="secondary"]:has(> div > p:first-child) {
+        background: rgba(34, 197, 94, 0.15) !important;
+        border: 1px solid rgba(34, 197, 94, 0.4) !important;
+        color: #15803d !important;
+        padding: 4px 12px !important;
+        border-radius: 20px !important;
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+    }
+    
+    button[data-testid="stBaseButton-secondary"][kind="secondary"]:has(> div > p:first-child):hover {
+        background: rgba(239, 68, 68, 0.15) !important;
+        border-color: rgba(239, 68, 68, 0.4) !important;
+        color: #dc2626 !important;
+    }
 
     /* Form styling */
     [data-testid="stForm"] {
@@ -719,19 +736,30 @@ with col_add:
                         st.session_state.card_ids.append(card_id_clean)
                         st.rerun()
         
-        # Display card ID tags
+        # Display card ID tags with X inside
         if st.session_state.card_ids:
-            tags_html = '<div class="card-tags-container">'
-            for cid in st.session_state.card_ids:
-                tags_html += f'<span class="card-tag">{cid}</span>'
-            tags_html += '</div>'
-            st.markdown(tags_html, unsafe_allow_html=True)
-            
-            # Remove buttons
-            cols = st.columns(len(st.session_state.card_ids))
+            tag_cols = st.columns(len(st.session_state.card_ids) + 1)  # +1 for spacing
             for i, cid in enumerate(st.session_state.card_ids):
-                with cols[i]:
-                    if st.button(f"✕ {cid}", key=f"remove_{cid}", type="secondary"):
+                with tag_cols[i]:
+                    # Custom styled button using markdown + button
+                    st.markdown(f"""
+                        <style>
+                            div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{
+                                background: rgba(34, 197, 94, 0.15) !important;
+                                border: 1px solid rgba(34, 197, 94, 0.4) !important;
+                                color: #15803d !important;
+                                border-radius: 20px !important;
+                                font-weight: 600 !important;
+                                padding: 2px 12px !important;
+                            }}
+                            div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button:hover {{
+                                background: rgba(239, 68, 68, 0.15) !important;
+                                border-color: rgba(239, 68, 68, 0.4) !important;
+                                color: #dc2626 !important;
+                            }}
+                        </style>
+                    """, unsafe_allow_html=True)
+                    if st.button(f"✕ {cid}", key=f"remove_{cid}"):
                         st.session_state.card_ids.remove(cid)
                         st.rerun()
         
