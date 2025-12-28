@@ -275,6 +275,8 @@ ANNOTATION_COLORS = {
     "Red": "#FD7F76",
     "Yellow": "#F5C43D",
     "Purple": "#9B5EE3",
+    "Lavender": "#B391CA",
+    
 }
 
 COLOR_NAME_MAP = {v: k for k, v in ANNOTATION_COLORS.items()}
