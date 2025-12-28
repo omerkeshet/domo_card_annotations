@@ -790,7 +790,8 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
             
             if annotations:
                 annotation_options = {}
-                for ann in annotations:
+                sorted_annotations = sorted(annotations, key=lambda x: x.get("createdDate", 0), reverse=True)
+                for ann in sorted_annotations:
                     content_preview = ann['content'][:35] + ('...' if len(ann['content']) > 35 else '')
                     date_str = ann['dataPoint'].get('point1', 'N/A')
                     label = f"{content_preview} • {date_str}"
