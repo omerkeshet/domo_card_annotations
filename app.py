@@ -928,6 +928,23 @@ with st.container(border=True):
         if st.button("↻ Refresh", type="secondary", use_container_width=True, key="refresh_all"):
             st.session_state.all_annotations = get_snowflake_annotations()
             st.rerun()
+            
+    # Date filter
+    col_filter_start, col_filter_end, col_filter_btn = st.columns([2, 2, 1])
+    with col_filter_start:
+        st.markdown("<div class='tiny'>From Date</div>", unsafe_allow_html=True)
+        filter_start = st.date_input("From", value=date.today() - timedelta(days=365), label_visibility="collapsed", key="filter_start")
+    with col_filter_end:
+        st.markdown("<div class='tiny'>To Date</div>", unsafe_allow_html=True)
+        filter_end = st.date_input("To", value=date.today(), label_visibility="collapsed", key="filter_end")
+    with col_filter_btn:
+        st.markdown("<div class='tiny'>&nbsp;</div>", unsafe_allow_html=True)
+        if st.button("Apply", type="secondary", use_container_width=True, key="apply_filter"):
+            st.session_state.all_annotations = get_snowflake_annotations(
+                start_date=filter_start.strftime("%Y-%m-%d"),
+                end_date=filter_end.strftime("%Y-%m-%d")
+            )
+            st.rerun()
     
     # Load annotations if not loaded
     if "all_annotations" not in st.session_state:
@@ -1004,6 +1021,16 @@ with st.container(border=True):
             
             df = pd.DataFrame(df_data)
             df = df.sort_values("Date", ascending=False)
+
+            # Export button
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="🡻 Export CSV",
+                data=csv,
+                file_name=f"annotations_{date.today().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                type="secondary"
+            )
             
             st.dataframe(
                 df,
