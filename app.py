@@ -264,7 +264,6 @@ ANNOTATION_COLORS = {
     "Red": "#FD7F76",
     "Yellow": "#F5C43D",
     "Purple": "#9B5EE3",
-    "Lavender": "#B391CA",
 }
 
 COLOR_NAME_MAP = {v: k for k, v in ANNOTATION_COLORS.items()}
@@ -739,12 +738,20 @@ with col_add:
         
         # Display card ID tags with X inside
         if st.session_state.card_ids:
-            cols = st.columns(len(st.session_state.card_ids))
-            for i, cid in enumerate(st.session_state.card_ids):
-                with cols[i]:
-                    if st.button(f"✕ {cid}", key=f"tag_{cid}", type="secondary"):
-                        st.session_state.card_ids.remove(cid)
-                        st.rerun()
+            # Use fixed 4 columns max to keep buttons small
+            num_cols = min(len(st.session_state.card_ids), 4)
+            rows_needed = (len(st.session_state.card_ids) + num_cols - 1) // num_cols
+            
+            for row in range(rows_needed):
+                cols = st.columns(4)
+                for col_idx in range(4):
+                    tag_idx = row * 4 + col_idx
+                    if tag_idx < len(st.session_state.card_ids):
+                        cid = st.session_state.card_ids[tag_idx]
+                        with cols[col_idx]:
+                            if st.button(f"✕ {cid}", key=f"tag_{cid}", type="secondary", use_container_width=True):
+                                st.session_state.card_ids.remove(cid)
+                                st.rerun()
         
         st.write("")
         
