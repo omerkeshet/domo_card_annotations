@@ -736,27 +736,19 @@ with col_add:
                         st.session_state.card_ids.append(card_id_clean)
                         st.rerun()
         
-        # Display card ID tags with X inside
+        # Display selected card IDs using multiselect (allows removal by clicking X)
         if st.session_state.card_ids:
-            # CSS to keep tags compact and single-line
-            st.markdown("""
-                <style>
-                    [data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"] {
-                        white-space: nowrap !important;
-                        padding: 0.25rem 0.75rem !important;
-                        font-size: 0.8rem !important;
-                        min-height: 0 !important;
-                    }
-                </style>
-            """, unsafe_allow_html=True)
-            
-            # Display as flowing text-like elements using a single row
-            cols = st.columns(6)
-            for i, cid in enumerate(st.session_state.card_ids):
-                with cols[i % 6]:
-                    if st.button(f"✕ {cid}", key=f"tag_{cid}", type="secondary"):
-                        st.session_state.card_ids.remove(cid)
-                        st.rerun()
+            selected = st.multiselect(
+                "Selected cards",
+                options=st.session_state.card_ids,
+                default=st.session_state.card_ids,
+                label_visibility="collapsed",
+                key="card_ids_display"
+            )
+            # Update session state if user removed any
+            if set(selected) != set(st.session_state.card_ids):
+                st.session_state.card_ids = selected
+                st.rerun()
         
         st.write("")
         
