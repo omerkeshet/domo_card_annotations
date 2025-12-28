@@ -1023,7 +1023,7 @@ with st.container(border=True):
             df = df.sort_values("Date", ascending=False)
 
             # Export button
-            csv = df.to_csv(index=False).encode(''utf-8-sig')
+            csv = df.to_csv(index=False).encode('utf-8-sig')
             st.download_button(
                 label="🡻 Export CSV",
                 data=csv,
