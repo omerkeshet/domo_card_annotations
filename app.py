@@ -10,6 +10,9 @@ import pandas as pd
 from typing import Any, Dict, List
 from datetime import datetime, date
 from pathlib import Path
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+import snowflake.connector
 
 # ==========================
 # PAGE CONFIG & STYLING
@@ -242,6 +245,18 @@ st.markdown("""
 DOMO_INSTANCE = st.secrets["domo"]["instance"]
 DOMO_DEVELOPER_TOKEN = st.secrets["domo"]["developer_token"]
 
+# Snowflake configuration
+SNOWFLAKE_CONFIG = {
+    "account": st.secrets["snowflake"]["account"],
+    "user": st.secrets["snowflake"]["user"],
+    "private_key": st.secrets["snowflake"]["private_key"],
+    "database": st.secrets["snowflake"]["database"],
+    "schema": st.secrets["snowflake"]["schema"],
+    "warehouse": st.secrets["snowflake"]["warehouse"],
+    "role": st.secrets["snowflake"]["role"],
+}
+SNOWFLAKE_TABLE = st.secrets["snowflake"]["table"]
+
 # Available colors for annotations
 ANNOTATION_COLORS = {
     "Blue": "#72B0D7",
@@ -396,6 +411,197 @@ def get_card_title(card_def: Dict[str, Any]) -> str:
 
 
 # ==========================
+# SNOWFLAKE FUNCTIONS
+# ==========================
+def get_snowflake_connection():
+    """Create a Snowflake connection using private key authentication."""
+    # Parse the private key from PEM string
+    private_key_pem = SNOWFLAKE_CONFIG["private_key"]
+    
+    # Handle the private key format (replace literal \n with actual newlines if needed)
+    if "\\n" in private_key_pem:
+        private_key_pem = private_key_pem.replace("\\n", "\n")
+    
+    p_key = serialization.load_pem_private_key(
+        private_key_pem.encode(),
+        password=None,
+        backend=default_backend()
+    )
+    
+    pkb = p_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    
+    conn = snowflake.connector.connect(
+        account=SNOWFLAKE_CONFIG["account"],
+        user=SNOWFLAKE_CONFIG["user"],
+        private_key=pkb,
+        database=SNOWFLAKE_CONFIG["database"],
+        schema=SNOWFLAKE_CONFIG["schema"],
+        warehouse=SNOWFLAKE_CONFIG["warehouse"],
+        role=SNOWFLAKE_CONFIG["role"],
+    )
+    return conn
+
+
+def insert_annotation_to_snowflake(
+    card_id: str,
+    annotation_id: int,
+    user_id: int,
+    user_name: str,
+    color: str,
+    content: str,
+    entry_date: str
+) -> bool:
+    """Insert a new annotation record into Snowflake."""
+    try:
+        conn = get_snowflake_connection()
+        cursor = conn.cursor()
+        
+        insert_sql = f"""
+            INSERT INTO {SNOWFLAKE_TABLE} 
+            (CARD_ID, ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+        
+        cursor.execute(insert_sql, (
+            int(card_id),
+            annotation_id,
+            user_id,
+            user_name,
+            color,
+            content,
+            entry_date
+        ))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Snowflake insert error: {str(e)}")
+        return False
+
+
+def delete_annotation_from_snowflake(annotation_id: int) -> bool:
+    """Delete an annotation record from Snowflake."""
+    try:
+        conn = get_snowflake_connection()
+        cursor = conn.cursor()
+        
+        delete_sql = f"DELETE FROM {SNOWFLAKE_TABLE} WHERE ID = %s"
+        cursor.execute(delete_sql, (annotation_id,))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Snowflake delete error: {str(e)}")
+        return False
+
+
+def get_snowflake_annotations(card_id: str) -> List[Dict[str, Any]]:
+    """Get all annotations for a card from Snowflake."""
+    try:
+        conn = get_snowflake_connection()
+        cursor = conn.cursor()
+        
+        select_sql = f"""
+            SELECT ID, CARD_ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE
+            FROM {SNOWFLAKE_TABLE}
+            WHERE CARD_ID = %s
+        """
+        cursor.execute(select_sql, (int(card_id),))
+        
+        rows = cursor.fetchall()
+        columns = ["ID", "CARD_ID", "DOMO_USER_ID", "DOMO_USER_NAME", "COLOR", "CONTENT", "ENTRY_DATE"]
+        
+        results = []
+        for row in rows:
+            results.append(dict(zip(columns, row)))
+        
+        cursor.close()
+        conn.close()
+        return results
+    except Exception as e:
+        st.error(f"Snowflake query error: {str(e)}")
+        return []
+
+
+def sync_card_annotations_to_snowflake(card_id: str, domo_annotations: List[Dict[str, Any]]) -> Dict[str, int]:
+    """
+    Sync all annotations for a card from Domo to Snowflake.
+    Returns counts of inserted, updated, and deleted records.
+    """
+    results = {"inserted": 0, "updated": 0, "deleted": 0, "unchanged": 0}
+    
+    try:
+        # Get current Snowflake annotations for this card
+        sf_annotations = get_snowflake_annotations(card_id)
+        sf_by_id = {ann["ID"]: ann for ann in sf_annotations}
+        
+        # Get Domo annotation IDs
+        domo_by_id = {ann.get("id"): ann for ann in domo_annotations}
+        
+        conn = get_snowflake_connection()
+        cursor = conn.cursor()
+        
+        # Process Domo annotations (INSERT or UPDATE)
+        for ann_id, ann in domo_by_id.items():
+            entry_date = ann.get("dataPoint", {}).get("point1", "")
+            content = ann.get("content", "")
+            color = ann.get("color", "")
+            user_id = ann.get("userId", 0)
+            user_name = ann.get("userName", "Unknown")
+            
+            if ann_id in sf_by_id:
+                # Check if update needed
+                sf_ann = sf_by_id[ann_id]
+                if (sf_ann["CONTENT"] != content or 
+                    sf_ann["COLOR"] != color or 
+                    str(sf_ann["ENTRY_DATE"]) != entry_date):
+                    # UPDATE
+                    update_sql = f"""
+                        UPDATE {SNOWFLAKE_TABLE}
+                        SET CONTENT = %s, COLOR = %s, ENTRY_DATE = %s,
+                            DOMO_USER_ID = %s, DOMO_USER_NAME = %s
+                        WHERE ID = %s
+                    """
+                    cursor.execute(update_sql, (content, color, entry_date, user_id, user_name, ann_id))
+                    results["updated"] += 1
+                else:
+                    results["unchanged"] += 1
+            else:
+                # INSERT
+                insert_sql = f"""
+                    INSERT INTO {SNOWFLAKE_TABLE} 
+                    (CARD_ID, ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(insert_sql, (int(card_id), ann_id, user_id, user_name, color, content, entry_date))
+                results["inserted"] += 1
+        
+        # Delete annotations that exist in Snowflake but not in Domo
+        for sf_id in sf_by_id.keys():
+            if sf_id not in domo_by_id:
+                delete_sql = f"DELETE FROM {SNOWFLAKE_TABLE} WHERE ID = %s"
+                cursor.execute(delete_sql, (sf_id,))
+                results["deleted"] += 1
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return results
+    except Exception as e:
+        st.error(f"Snowflake sync error: {str(e)}")
+        return results
+
+
+# ==========================
 # STREAMLIT APP
 # ==========================
 
@@ -452,7 +658,7 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
     
     # Card Info Header
     with st.container(border=True):
-        col1, col2, col3 = st.columns([3, 1, 1])
+        col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
         
         with col1:
             st.markdown(f"<div class='label'>Loaded Card</div>", unsafe_allow_html=True)
@@ -466,6 +672,18 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
             st.markdown("</div>", unsafe_allow_html=True)
         
         with col3:
+            st.write("")
+            if st.button("⇄ Sync", type="secondary", use_container_width=True, help="Sync annotations to Snowflake"):
+                with st.spinner("Syncing to Snowflake..."):
+                    sync_results = sync_card_annotations_to_snowflake(card_id, annotations)
+                    st.success(
+                        f"Sync complete! Inserted: {sync_results['inserted']}, "
+                        f"Updated: {sync_results['updated']}, "
+                        f"Deleted: {sync_results['deleted']}, "
+                        f"Unchanged: {sync_results['unchanged']}"
+                    )
+        
+        with col4:
             st.write("")
             if st.button("✕ Close", type="secondary", use_container_width=True):
                 del st.session_state.card_def
@@ -516,6 +734,7 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
                                     "color": ANNOTATION_COLORS[color_name],
                                 }
                                 
+                                # Save to Domo
                                 save_card_definition(
                                     DOMO_INSTANCE, 
                                     DOMO_DEVELOPER_TOKEN, 
@@ -524,10 +743,37 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
                                     new_annotations=[new_annotation]
                                 )
                                 
+                                # Refresh to get the new annotation with its ID
                                 st.session_state.card_def = fetch_kpi_definition(
                                     DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id
                                 )
-                                st.success("Annotation added!")
+                                
+                                # Find the newly created annotation (most recent one with matching content)
+                                new_annotations = get_annotations(st.session_state.card_def)
+                                new_ann = None
+                                for ann in sorted(new_annotations, key=lambda x: x.get("createdDate", 0), reverse=True):
+                                    if ann.get("content") == annotation_text:
+                                        new_ann = ann
+                                        break
+                                
+                                # Sync to Snowflake
+                                if new_ann:
+                                    sf_success = insert_annotation_to_snowflake(
+                                        card_id=card_id,
+                                        annotation_id=new_ann.get("id"),
+                                        user_id=new_ann.get("userId", 0),
+                                        user_name=new_ann.get("userName", "Unknown"),
+                                        color=ANNOTATION_COLORS[color_name],
+                                        content=annotation_text,
+                                        entry_date=annotation_date.strftime("%Y-%m-%d")
+                                    )
+                                    if sf_success:
+                                        st.success("Annotation added & synced to Snowflake!")
+                                    else:
+                                        st.warning("Annotation added to Domo, but Snowflake sync failed.")
+                                else:
+                                    st.success("Annotation added!")
+                                
                                 st.rerun()
                                 
                             except Exception as e:
@@ -562,6 +808,7 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
                     annotation_id = annotation_options[selected]
                     with st.spinner("Deleting..."):
                         try:
+                            # Delete from Domo
                             save_card_definition(
                                 DOMO_INSTANCE, 
                                 DOMO_DEVELOPER_TOKEN, 
@@ -570,10 +817,18 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
                                 deleted_annotation_ids=[annotation_id]
                             )
                             
+                            # Delete from Snowflake
+                            sf_success = delete_annotation_from_snowflake(annotation_id)
+                            
                             st.session_state.card_def = fetch_kpi_definition(
                                 DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id
                             )
-                            st.success("Annotation deleted!")
+                            
+                            if sf_success:
+                                st.success("Annotation deleted & removed from Snowflake!")
+                            else:
+                                st.warning("Annotation deleted from Domo, but Snowflake sync failed.")
+                            
                             st.rerun()
                             
                         except Exception as e:
