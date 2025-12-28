@@ -958,6 +958,7 @@ if "card_def" in st.session_state and "card_id" in st.session_state:
                     })
                 
                 df = pd.DataFrame(df_data)
+                df = df.sort_values("Created", ascending=False)
                 
                 st.dataframe(
                     df,
