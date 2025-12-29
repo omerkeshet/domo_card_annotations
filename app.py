@@ -557,8 +557,8 @@ def insert_annotation_to_snowflake(
         
         insert_sql = f"""
             INSERT INTO {SNOWFLAKE_TABLE} 
-            (CARD_ID, ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (CARD_ID, ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE, CREATED_DATE)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP())
         """
         
         cursor.execute(insert_sql, (
