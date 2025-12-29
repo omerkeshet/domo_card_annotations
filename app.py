@@ -236,17 +236,6 @@ st.markdown("""
         pointer-events: none;
         letter-spacing: 0.02em;
     }
-
-    /* Multiselect tags - light blue instead of red */
-    span[data-baseweb="tag"] {
-        background-color: rgba(31, 79, 216, 0.15) !important;
-    }
-    span[data-baseweb="tag"] span {
-        color: #1f4fd8 !important;
-    }
-    span[data-baseweb="tag"]:hover {
-        background-color: rgba(31, 79, 216, 0.25) !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -275,8 +264,6 @@ ANNOTATION_COLORS = {
     "Red": "#FD7F76",
     "Yellow": "#F5C43D",
     "Purple": "#9B5EE3",
-    "Lavender": "#B391CA",
-    
 }
 
 COLOR_NAME_MAP = {v: k for k, v in ANNOTATION_COLORS.items()}
@@ -620,6 +607,7 @@ def sync_card_annotations(card_id: str) -> Dict[str, int]:
     """
     Sync annotations from Domo to Snowflake for a specific card.
     Only adds missing annotations, never deletes.
+    Also backfills CREATED_DATE from Domo.
     """
     results = {"inserted": 0, "updated": 0, "skipped": 0}
     
@@ -645,17 +633,27 @@ def sync_card_annotations(card_id: str) -> Dict[str, int]:
             user_id = ann.get("userId", 0)
             user_name = ann.get("userName", "Unknown")
             
+            # Convert Domo createdDate (milliseconds) to timestamp
+            created_ts = ann.get("createdDate", 0)
+            created_date = datetime.fromtimestamp(created_ts / 1000) if created_ts else None
+            
             if ann_id in sf_by_id:
-                # Check if update needed
+                # Check if update needed (content, color, or missing created_date)
                 sf_ann = sf_by_id[ann_id]
-                if (sf_ann["CONTENT"] != content or sf_ann["COLOR"] != color):
+                needs_update = (
+                    sf_ann["CONTENT"] != content or 
+                    sf_ann["COLOR"] != color or
+                    sf_ann.get("CREATED_DATE") is None
+                )
+                
+                if needs_update:
                     update_sql = f"""
                         UPDATE {SNOWFLAKE_TABLE}
                         SET CONTENT = %s, COLOR = %s, ENTRY_DATE = %s,
-                            DOMO_USER_ID = %s, DOMO_USER_NAME = %s
+                            DOMO_USER_ID = %s, DOMO_USER_NAME = %s, CREATED_DATE = %s
                         WHERE ID = %s
                     """
-                    cursor.execute(update_sql, (content, color, entry_date, user_id, user_name, ann_id))
+                    cursor.execute(update_sql, (content, color, entry_date, user_id, user_name, created_date, ann_id))
                     results["updated"] += 1
                 else:
                     results["skipped"] += 1
@@ -663,10 +661,10 @@ def sync_card_annotations(card_id: str) -> Dict[str, int]:
                 # Insert to Snowflake
                 insert_sql = f"""
                     INSERT INTO {SNOWFLAKE_TABLE} 
-                    (CARD_ID, ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (CARD_ID, ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE, CREATED_DATE)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """
-                cursor.execute(insert_sql, (int(card_id), ann_id, user_id, user_name, color, content, entry_date))
+                cursor.execute(insert_sql, (int(card_id), ann_id, user_id, user_name, color, content, entry_date, created_date))
                 results["inserted"] += 1
         
         conn.commit()
@@ -928,23 +926,6 @@ with st.container(border=True):
         if st.button("↻ Refresh", type="secondary", use_container_width=True, key="refresh_all"):
             st.session_state.all_annotations = get_snowflake_annotations()
             st.rerun()
-            
-    # Date filter
-    col_filter_start, col_filter_end, col_filter_btn = st.columns([2, 2, 1])
-    with col_filter_start:
-        st.markdown("<div class='tiny'>From Date</div>", unsafe_allow_html=True)
-        filter_start = st.date_input("From", value=date.today() - timedelta(days=365), label_visibility="collapsed", key="filter_start")
-    with col_filter_end:
-        st.markdown("<div class='tiny'>To Date</div>", unsafe_allow_html=True)
-        filter_end = st.date_input("To", value=date.today(), label_visibility="collapsed", key="filter_end")
-    with col_filter_btn:
-        st.markdown("<div class='tiny'>&nbsp;</div>", unsafe_allow_html=True)
-        if st.button("Apply", type="secondary", use_container_width=True, key="apply_filter"):
-            st.session_state.all_annotations = get_snowflake_annotations(
-                start_date=filter_start.strftime("%Y-%m-%d"),
-                end_date=filter_end.strftime("%Y-%m-%d")
-            )
-            st.rerun()
     
     # Load annotations if not loaded
     if "all_annotations" not in st.session_state:
@@ -1021,16 +1002,6 @@ with st.container(border=True):
             
             df = pd.DataFrame(df_data)
             df = df.sort_values("Date", ascending=False)
-
-            # Export button
-            csv = df.to_csv(index=False).encode('utf-8-sig')
-            st.download_button(
-                label="🡻 Export CSV",
-                data=csv,
-                file_name=f"annotations_{date.today().strftime('%Y%m%d')}.csv",
-                mime="text/csv",
-                type="secondary"
-            )
             
             st.dataframe(
                 df,
