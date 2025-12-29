@@ -504,7 +504,7 @@ def get_snowflake_annotations(
         cursor = conn.cursor()
         
         select_sql = f"""
-            SELECT ID, CARD_ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE
+            SELECT ID, CARD_ID, DOMO_USER_ID, DOMO_USER_NAME, COLOR, CONTENT, ENTRY_DATE, CREATED_DATE
             FROM {SNOWFLAKE_TABLE}
             WHERE 1=1
         """
@@ -527,7 +527,7 @@ def get_snowflake_annotations(
         cursor.execute(select_sql, params)
         
         rows = cursor.fetchall()
-        columns = ["ID", "CARD_ID", "DOMO_USER_ID", "DOMO_USER_NAME", "COLOR", "CONTENT", "ENTRY_DATE"]
+        columns = ["ID", "CARD_ID", "DOMO_USER_ID", "DOMO_USER_NAME", "COLOR", "CONTENT", "ENTRY_DATE", "CREATED_DATE"]
         
         results = []
         for row in rows:
@@ -927,6 +927,23 @@ with st.container(border=True):
             st.session_state.all_annotations = get_snowflake_annotations()
             st.rerun()
     
+    # Date filter
+    col_filter_start, col_filter_end, col_filter_btn = st.columns([2, 2, 1])
+    with col_filter_start:
+        st.markdown("<div class='tiny'>From Date</div>", unsafe_allow_html=True)
+        filter_start = st.date_input("From", value=date.today() - timedelta(days=365), label_visibility="collapsed", key="filter_start")
+    with col_filter_end:
+        st.markdown("<div class='tiny'>To Date</div>", unsafe_allow_html=True)
+        filter_end = st.date_input("To", value=date.today(), label_visibility="collapsed", key="filter_end")
+    with col_filter_btn:
+        st.markdown("<div class='tiny'>&nbsp;</div>", unsafe_allow_html=True)
+        if st.button("Apply", type="secondary", use_container_width=True, key="apply_filter"):
+            st.session_state.all_annotations = get_snowflake_annotations(
+                start_date=filter_start.strftime("%Y-%m-%d"),
+                end_date=filter_end.strftime("%Y-%m-%d")
+            )
+            st.rerun()
+    
     # Load annotations if not loaded
     if "all_annotations" not in st.session_state:
         st.session_state.all_annotations = get_snowflake_annotations()
@@ -991,17 +1008,31 @@ with st.container(border=True):
             # Table View
             df_data = []
             for ann in annotations:
+                created_date = ann.get("CREATED_DATE")
+                created_str = created_date.strftime("%Y-%m-%d %H:%M") if created_date else "—"
+                
                 df_data.append({
                     "Content": ann.get("CONTENT"),
                     "Date": str(ann.get("ENTRY_DATE", "—")),
                     "Color": COLOR_NAME_MAP.get(ann.get("COLOR"), ann.get("COLOR", "—")),
                     "Card ID": ann.get("CARD_ID") if ann.get("CARD_ID") else "Global",
                     "Created By": ann.get("DOMO_USER_NAME", "—"),
+                    "Created": created_str,
                     "ID": ann.get("ID") if ann.get("ID") else "—",
                 })
             
             df = pd.DataFrame(df_data)
             df = df.sort_values("Date", ascending=False)
+            
+            # Export CSV button
+            csv = df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="🡻 Export CSV",
+                data=csv,
+                file_name=f"annotations_{date.today().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                type="secondary"
+            )
             
             st.dataframe(
                 df,
@@ -1013,6 +1044,7 @@ with st.container(border=True):
                     "Color": st.column_config.TextColumn("Color", width="small"),
                     "Card ID": st.column_config.TextColumn("Card ID", width="small"),
                     "Created By": st.column_config.TextColumn("Created By", width="medium"),
+                    "Created": st.column_config.TextColumn("Created", width="medium"),
                     "ID": st.column_config.TextColumn("ID", width="small"),
                 }
             )
