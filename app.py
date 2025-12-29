@@ -603,11 +603,12 @@ def delete_annotation_from_snowflake(annotation_id: Optional[int] = None, card_i
         return False
 
 
-def sync_card_annotations(card_id: str) -> Dict[str, int]:
+def sync_card_annotations(card_id: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, int]:
     """
     Sync annotations from Domo to Snowflake for a specific card.
     Only adds missing annotations, never deletes.
     Also backfills CREATED_DATE from Domo.
+    Optionally filter by annotation date range (ENTRY_DATE).
     """
     results = {"inserted": 0, "updated": 0, "skipped": 0}
     
@@ -615,6 +616,20 @@ def sync_card_annotations(card_id: str) -> Dict[str, int]:
         # Get Domo annotations
         card_def = fetch_kpi_definition(DOMO_INSTANCE, DOMO_DEVELOPER_TOKEN, card_id)
         domo_annotations = get_domo_annotations(card_def)
+        
+        # Filter by date range if provided
+        if start_date or end_date:
+            filtered_annotations = []
+            for ann in domo_annotations:
+                entry_date = ann.get("dataPoint", {}).get("point1", "")
+                if entry_date:
+                    if start_date and entry_date < start_date:
+                        continue
+                    if end_date and entry_date > end_date:
+                        continue
+                    filtered_annotations.append(ann)
+            domo_annotations = filtered_annotations
+        
         domo_by_id = {ann.get("id"): ann for ann in domo_annotations}
         
         # Get Snowflake annotations for this card (only those with ID)
@@ -895,10 +910,26 @@ with st.container(border=True):
     with col_sync_input:
         sync_card_id = st.text_input("Card ID to sync", placeholder="Enter card ID...", label_visibility="collapsed", key="sync_card_id")
     with col_sync_btn:
+        st.markdown("<div class='tiny'>&nbsp;</div>", unsafe_allow_html=True)
+    
+    # Date range for sync
+    col_sync_start, col_sync_end, col_sync_action = st.columns([2, 2, 1])
+    with col_sync_start:
+        st.markdown("<div class='tiny'>From Date</div>", unsafe_allow_html=True)
+        sync_start_date = st.date_input("Sync From", value=date.today() - timedelta(days=365), label_visibility="collapsed", key="sync_start")
+    with col_sync_end:
+        st.markdown("<div class='tiny'>To Date</div>", unsafe_allow_html=True)
+        sync_end_date = st.date_input("Sync To", value=date.today(), label_visibility="collapsed", key="sync_end")
+    with col_sync_action:
+        st.markdown("<div class='tiny'>&nbsp;</div>", unsafe_allow_html=True)
         if st.button("⇄ Sync", type="primary", use_container_width=True):
             if sync_card_id:
                 with st.spinner("Syncing..."):
-                    results = sync_card_annotations(sync_card_id)
+                    results = sync_card_annotations(
+                        sync_card_id,
+                        start_date=sync_start_date.strftime("%Y-%m-%d"),
+                        end_date=sync_end_date.strftime("%Y-%m-%d")
+                    )
                     st.success(
                         f"Sync complete! Inserted: {results['inserted']}, "
                         f"Updated: {results['updated']}, "
