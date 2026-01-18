@@ -24,12 +24,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# -----------------------------
-# Paths
-# -----------------------------
-LOGO_PATH = Path("assets/logo.png")
-
-
 # Custom CSS
 st.markdown("""
 <style>
