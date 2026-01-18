@@ -692,6 +692,37 @@ def sync_card_annotations(card_id: str, start_date: Optional[str] = None, end_da
         return results
 
 
+def push_to_domo(card_id: str, start_date: str, end_date: str, colors: List[str]) -> Dict[str, int]:
+    """
+    Push annotations from Snowflake to a Domo card.
+    Filters by date range and colors.
+    """
+    results = {"pushed": 0, "failed": 0}
+    
+    try:
+        # Get Snowflake annotations with filters
+        sf_annotations = get_snowflake_annotations(start_date=start_date, end_date=end_date)
+        
+        # Filter by colors
+        if colors:
+            sf_annotations = [ann for ann in sf_annotations if ann.get("COLOR") in colors]
+        
+        # Push each annotation to Domo
+        for ann in sf_annotations:
+            content = ann.get("CONTENT", "")
+            entry_date = str(ann.get("ENTRY_DATE", ""))
+            color = ann.get("COLOR", "#72B0D7")
+            
+            domo_ann = add_annotation_to_domo(card_id, content, entry_date, color)
+            if domo_ann:
+                results["pushed"] += 1
+            else:
+                results["failed"] += 1
+        
+        return results
+    except Exception as e:
+        st.error(f"Push to Domo error: {str(e)}")
+        return results
 # ==========================
 # SESSION STATE INIT
 # ==========================
@@ -937,6 +968,60 @@ with st.container(border=True):
                     )
             else:
                 st.error("Please enter a card ID")
+
+st.write("")
+
+# ==========================
+# PUSH TO DOMO SECTION
+# ==========================
+with st.container(border=True):
+    st.markdown("<div class='label'>Push to Domo</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='desc'>Insert Snowflake annotations into a Domo card.</div>",
+        unsafe_allow_html=True,
+    )
+    
+    push_card_id = st.text_input("Target Card ID", placeholder="Enter card ID...", label_visibility="collapsed", key="push_card_id")
+    
+    # Date range for push
+    col_push_start, col_push_end = st.columns(2)
+    with col_push_start:
+        st.markdown("<div class='tiny'>From Date</div>", unsafe_allow_html=True)
+        push_start_date = st.date_input("Push From", value=date.today() - timedelta(days=365), label_visibility="collapsed", key="push_start")
+    with col_push_end:
+        st.markdown("<div class='tiny'>To Date</div>", unsafe_allow_html=True)
+        push_end_date = st.date_input("Push To", value=date.today(), label_visibility="collapsed", key="push_end")
+    
+    # Color filter (multiselect)
+    st.markdown("<div class='tiny'>Colors (leave empty for all)</div>", unsafe_allow_html=True)
+    selected_colors = st.multiselect(
+        "Colors",
+        options=list(ANNOTATION_COLORS.keys()),
+        default=[],
+        label_visibility="collapsed",
+        key="push_colors"
+    )
+    
+    # Convert color names to hex values
+    color_hex_values = [ANNOTATION_COLORS[c] for c in selected_colors]
+    
+    if st.button("→ Push to Domo", type="primary", use_container_width=True):
+        if push_card_id:
+            with st.spinner("Pushing annotations to Domo..."):
+                results = push_to_domo(
+                    push_card_id,
+                    start_date=push_start_date.strftime("%Y-%m-%d"),
+                    end_date=push_end_date.strftime("%Y-%m-%d"),
+                    colors=color_hex_values
+                )
+                if results["pushed"] > 0:
+                    st.success(f"Pushed {results['pushed']} annotations to card {push_card_id}")
+                if results["failed"] > 0:
+                    st.warning(f"Failed to push {results['failed']} annotations")
+                if results["pushed"] == 0 and results["failed"] == 0:
+                    st.info("No annotations found matching the filters")
+        else:
+            st.error("Please enter a card ID")
 
 st.write("")
 
