@@ -735,7 +735,11 @@ if "card_ids" not in st.session_state:
 # ==========================
 
 # Header
-st.title("Annotations Manager")
+col_logo, col_title = st.columns([0.5, 4])
+with col_logo:
+    st.image("assets/logo.png", width=50)
+with col_title:
+    st.title("Annotations Manager")
 st.markdown(
     "<div class='muted'>Create and manage annotations. Optionally add to Domo cards.</div>",
     unsafe_allow_html=True,
