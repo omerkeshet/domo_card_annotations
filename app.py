@@ -28,16 +28,7 @@ st.set_page_config(
 # Paths
 # -----------------------------
 LOGO_PATH = Path("assets/logo.png")
-TEMPLATE_PATH = Path("assets/template_view_reports.xlsx")
 
-if not TEMPLATE_PATH.exists():
-    st.error(
-        "Template file not found. Please add it to the repo at "
-        "`assets/template_view_reports.xlsx` and redeploy the app."
-    )
-    st.stop()
-
-TEMPLATE_BYTES = TEMPLATE_PATH.read_bytes()
 
 # Custom CSS
 st.markdown("""
