@@ -977,11 +977,42 @@ st.write("")
 with st.container(border=True):
     st.markdown("<div class='label'>Push to Domo</div>", unsafe_allow_html=True)
     st.markdown(
-        "<div class='desc'>Insert Snowflake annotations into a Domo card.</div>",
+        "<div class='desc'>Insert Snowflake annotations into Domo cards.</div>",
         unsafe_allow_html=True,
     )
     
-    push_card_id = st.text_input("Target Card ID", placeholder="Enter card ID...", label_visibility="collapsed", key="push_card_id")
+    # Card IDs section
+    st.markdown("<div class='tiny'>Target Card IDs</div>", unsafe_allow_html=True)
+    
+    col_push_input, col_push_btn = st.columns([3, 1])
+    with col_push_input:
+        new_push_card_id = st.text_input("Card ID", placeholder="Enter card ID...", label_visibility="collapsed", key="new_push_card_id")
+    with col_push_btn:
+        if st.button("+ Add", type="secondary", use_container_width=True, key="add_push_card"):
+            if new_push_card_id and new_push_card_id.strip():
+                card_id_clean = new_push_card_id.strip()
+                if "push_card_ids" not in st.session_state:
+                    st.session_state.push_card_ids = []
+                if card_id_clean not in st.session_state.push_card_ids:
+                    st.session_state.push_card_ids.append(card_id_clean)
+                    st.rerun()
+    
+    # Display selected card IDs using multiselect (allows removal by clicking X)
+    if "push_card_ids" not in st.session_state:
+        st.session_state.push_card_ids = []
+    
+    if st.session_state.push_card_ids:
+        selected_push_cards = st.multiselect(
+            "Selected cards",
+            options=st.session_state.push_card_ids,
+            default=st.session_state.push_card_ids,
+            label_visibility="collapsed",
+            key="push_card_ids_display"
+        )
+        # Update session state if user removed any
+        if set(selected_push_cards) != set(st.session_state.push_card_ids):
+            st.session_state.push_card_ids = selected_push_cards
+            st.rerun()
     
     # Date range for push
     col_push_start, col_push_end = st.columns(2)
@@ -1006,22 +1037,32 @@ with st.container(border=True):
     color_hex_values = [ANNOTATION_COLORS[c] for c in selected_colors]
     
     if st.button("→ Push to Domo", type="primary", use_container_width=True):
-        if push_card_id:
+        if st.session_state.push_card_ids:
             with st.spinner("Pushing annotations to Domo..."):
-                results = push_to_domo(
-                    push_card_id,
-                    start_date=push_start_date.strftime("%Y-%m-%d"),
-                    end_date=push_end_date.strftime("%Y-%m-%d"),
-                    colors=color_hex_values
-                )
-                if results["pushed"] > 0:
-                    st.success(f"Pushed {results['pushed']} annotations to card {push_card_id}")
-                if results["failed"] > 0:
-                    st.warning(f"Failed to push {results['failed']} annotations")
-                if results["pushed"] == 0 and results["failed"] == 0:
+                total_pushed = 0
+                total_failed = 0
+                success_cards = []
+                
+                for card_id in st.session_state.push_card_ids:
+                    results = push_to_domo(
+                        card_id,
+                        start_date=push_start_date.strftime("%Y-%m-%d"),
+                        end_date=push_end_date.strftime("%Y-%m-%d"),
+                        colors=color_hex_values
+                    )
+                    total_pushed += results["pushed"]
+                    total_failed += results["failed"]
+                    if results["pushed"] > 0:
+                        success_cards.append(card_id)
+                
+                if total_pushed > 0:
+                    st.success(f"Pushed {total_pushed} annotations to cards: {', '.join(success_cards)}")
+                if total_failed > 0:
+                    st.warning(f"Failed to push {total_failed} annotations")
+                if total_pushed == 0 and total_failed == 0:
                     st.info("No annotations found matching the filters")
         else:
-            st.error("Please enter a card ID")
+            st.error("Please add at least one card ID")
 
 st.write("")
 
