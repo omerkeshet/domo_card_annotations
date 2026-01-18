@@ -937,15 +937,42 @@ st.write("")
 with st.container(border=True):
     st.markdown("<div class='label'>Sync Card</div>", unsafe_allow_html=True)
     st.markdown(
-        "<div class='desc'>Sync annotations between Domo and Snowflake for a specific card.</div>",
+        "<div class='desc'>Sync annotations from Domo to Snowflake for specific cards.</div>",
         unsafe_allow_html=True,
     )
     
+    # Card IDs section
+    st.markdown("<div class='tiny'>Card IDs</div>", unsafe_allow_html=True)
+    
     col_sync_input, col_sync_btn = st.columns([3, 1])
     with col_sync_input:
-        sync_card_id = st.text_input("Card ID to sync", placeholder="Enter card ID...", label_visibility="collapsed", key="sync_card_id")
+        new_sync_card_id = st.text_input("Card ID", placeholder="Enter card ID...", label_visibility="collapsed", key="new_sync_card_id")
     with col_sync_btn:
-        st.markdown("<div class='tiny'>&nbsp;</div>", unsafe_allow_html=True)
+        if st.button("+ Add", type="secondary", use_container_width=True, key="add_sync_card"):
+            if new_sync_card_id and new_sync_card_id.strip():
+                card_id_clean = new_sync_card_id.strip()
+                if "sync_card_ids" not in st.session_state:
+                    st.session_state.sync_card_ids = []
+                if card_id_clean not in st.session_state.sync_card_ids:
+                    st.session_state.sync_card_ids.append(card_id_clean)
+                    st.rerun()
+    
+    # Display selected card IDs using multiselect (allows removal by clicking X)
+    if "sync_card_ids" not in st.session_state:
+        st.session_state.sync_card_ids = []
+    
+    if st.session_state.sync_card_ids:
+        selected_sync_cards = st.multiselect(
+            "Selected cards",
+            options=st.session_state.sync_card_ids,
+            default=st.session_state.sync_card_ids,
+            label_visibility="collapsed",
+            key="sync_card_ids_display"
+        )
+        # Update session state if user removed any
+        if set(selected_sync_cards) != set(st.session_state.sync_card_ids):
+            st.session_state.sync_card_ids = selected_sync_cards
+            st.rerun()
     
     # Date range for sync
     col_sync_start, col_sync_end, col_sync_action = st.columns([2, 2, 1])
@@ -958,20 +985,29 @@ with st.container(border=True):
     with col_sync_action:
         st.markdown("<div class='tiny'>&nbsp;</div>", unsafe_allow_html=True)
         if st.button("⇄ Sync", type="primary", use_container_width=True):
-            if sync_card_id:
+            if st.session_state.sync_card_ids:
                 with st.spinner("Syncing..."):
-                    results = sync_card_annotations(
-                        sync_card_id,
-                        start_date=sync_start_date.strftime("%Y-%m-%d"),
-                        end_date=sync_end_date.strftime("%Y-%m-%d")
-                    )
+                    total_inserted = 0
+                    total_updated = 0
+                    total_skipped = 0
+                    
+                    for card_id in st.session_state.sync_card_ids:
+                        results = sync_card_annotations(
+                            card_id,
+                            start_date=sync_start_date.strftime("%Y-%m-%d"),
+                            end_date=sync_end_date.strftime("%Y-%m-%d")
+                        )
+                        total_inserted += results["inserted"]
+                        total_updated += results["updated"]
+                        total_skipped += results["skipped"]
+                    
                     st.success(
-                        f"Sync complete! Inserted: {results['inserted']}, "
-                        f"Updated: {results['updated']}, "
-                        f"Skipped: {results['skipped']}"
+                        f"Sync complete! Inserted: {total_inserted}, "
+                        f"Updated: {total_updated}, "
+                        f"Skipped: {total_skipped}"
                     )
             else:
-                st.error("Please enter a card ID")
+                st.error("Please add at least one card ID")
 
 st.write("")
 
