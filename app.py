@@ -236,6 +236,55 @@ st.markdown("""
         pointer-events: none;
         letter-spacing: 0.02em;
     }
+
+    /* Tooltip */
+    .info-tooltip {
+        position: relative;
+        display: inline-block;
+        cursor: help;
+        margin-left: 6px;
+        font-size: 0.8rem;
+        color: rgba(49, 51, 63, 0.4);
+        transition: color 0.2s;
+    }
+    .info-tooltip:hover {
+        color: #1f4fd8;
+    }
+    .info-tooltip .tooltiptext {
+        visibility: hidden;
+        width: 260px;
+        background-color: rgba(30, 30, 30, 0.95);
+        color: #fff;
+        text-align: right;
+        direction: rtl;
+        border-radius: 10px;
+        padding: 12px 14px;
+        position: absolute;
+        z-index: 1000;
+        top: 130%;
+        left: 50%;
+        transform: translateX(-50%);
+        opacity: 0;
+        transition: opacity 0.2s, visibility 0.2s;
+        font-size: 0.82rem;
+        font-weight: 400;
+        line-height: 1.6;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .info-tooltip .tooltiptext::after {
+        content: "";
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        margin-left: -6px;
+        border-width: 6px;
+        border-style: solid;
+        border-color: transparent transparent rgba(30, 30, 30, 0.95) transparent;
+    }
+    .info-tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -755,7 +804,11 @@ col_add, col_delete = st.columns(2, gap="medium")
 # ==========================
 with col_add:
     with st.container(border=True):
-        st.markdown("<div class='label'>Add Annotation</div>", unsafe_allow_html=True)
+        st.markdown("""<div class='label'>Add Annotation 
+            <span class="info-tooltip">ⓘ
+                <span class="tooltiptext">כאן ניתן להוסיף הערה חדשה. מלאו את התוכן, בחרו תאריך וצבע. אם רוצים להוסיף לכרטיס דומו - הוסיפו מזהה כרטיס. בלי כרטיס - ההערה תישמר רק בסנופלייק.</span>
+            </span>
+        </div>""", unsafe_allow_html=True)
         st.markdown(
             "<div class='desc'>Create a new annotation. Optionally add to Domo cards.</div>",
             unsafe_allow_html=True,
@@ -853,7 +906,11 @@ with col_add:
 # ==========================
 with col_delete:
     with st.container(border=True):
-        st.markdown("<div class='label'>Delete Annotation</div>", unsafe_allow_html=True)
+        st.markdown("""<div class='label'>Delete Annotation 
+            <span class="info-tooltip">ⓘ
+                <span class="tooltiptext">כאן ניתן למחוק הערה קיימת. בחרו טווח תאריכים ולחצו Load Annotations. בחרו הערה מהרשימה ולחצו Delete. ההערה תימחק מסנופלייק ומדומו.</span>
+            </span>
+        </div>""", unsafe_allow_html=True)
         st.markdown(
             "<div class='desc'>Filter by date range and select annotation to delete.</div>",
             unsafe_allow_html=True,
@@ -935,7 +992,11 @@ st.write("")
 # SYNC SECTION
 # ==========================
 with st.container(border=True):
-    st.markdown("<div class='label'>Sync Card</div>", unsafe_allow_html=True)
+    st.markdown("""<div class='label'>Sync Card 
+        <span class="info-tooltip">ⓘ
+            <span class="tooltiptext">סנכרון מדומו לסנופלייק. הוסיפו מזהי כרטיסים, בחרו טווח תאריכים ולחצו Sync. הערות חדשות יתווספו, הערות שהשתנו יעודכנו. לא מתבצעת מחיקה.</span>
+        </span>
+    </div>""", unsafe_allow_html=True)
     st.markdown(
         "<div class='desc'>Sync annotations from Domo to Snowflake for specific cards.</div>",
         unsafe_allow_html=True,
@@ -1015,7 +1076,11 @@ st.write("")
 # PUSH TO DOMO SECTION
 # ==========================
 with st.container(border=True):
-    st.markdown("<div class='label'>Push to Domo</div>", unsafe_allow_html=True)
+    st.markdown("""<div class='label'>Push to Domo 
+        <span class="info-tooltip">ⓘ
+            <span class="tooltiptext">דחיפת הערות מסנופלייק לדומו. הוסיפו מזהי כרטיסי יעד, בחרו טווח תאריכים וצבעים (ריק = הכל), ולחצו Push. ההערות יתווספו לכל הכרטיסים שנבחרו.</span>
+        </span>
+    </div>""", unsafe_allow_html=True)
     st.markdown(
         "<div class='desc'>Insert Snowflake annotations into Domo cards.</div>",
         unsafe_allow_html=True,
@@ -1112,7 +1177,11 @@ st.write("")
 with st.container(border=True):
     col_header, col_toggle, col_refresh = st.columns([3, 1.5, 1])
     with col_header:
-        st.markdown("<div class='label'>All Annotations</div>", unsafe_allow_html=True)
+        st.markdown("""<div class='label'>All Annotations 
+            <span class="info-tooltip">ⓘ
+                <span class="tooltiptext">צפייה בכל ההערות מסנופלייק. סננו לפי תאריכים ולחצו Apply. ניתן לעבור בין תצוגת טבלה לציר זמן, לייצא ל-CSV ולרענן.</span>
+            </span>
+        </div>""", unsafe_allow_html=True)
         st.markdown(
             "<div class='desc'>View all annotations from Snowflake.</div>",
             unsafe_allow_html=True,
