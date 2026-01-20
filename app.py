@@ -865,33 +865,28 @@ with col_add:
         if "card_ids" not in st.session_state:
             st.session_state.card_ids = []
         
-        # Preset dropdown
-        col_preset, col_preset_btn = st.columns([3, 1])
-        with col_preset:
-            card_preset = st.selectbox(
-                "Preset",
-                options=[""] + preset_options,
-                format_func=lambda x: "Select from common cards..." if x == "" else x,
+        col_input, col_btn = st.columns([3, 1])
+        with col_input:
+            # Single selectbox that allows typing custom values
+            card_input = st.selectbox(
+                "Card",
+                options=preset_options,
+                index=None,
+                placeholder="Select preset or type card ID...",
                 label_visibility="collapsed",
-                key="add_card_preset"
+                accept_new_options=True,
+                key="add_card_input"
             )
-        with col_preset_btn:
-            if st.button("+ Add", type="secondary", use_container_width=True, key="add_preset_btn"):
-                if card_preset:
-                    card_to_add = card_preset.split("(")[-1].rstrip(")")
-                    if card_to_add not in st.session_state.card_ids:
-                        st.session_state.card_ids.append(card_to_add)
-                        st.rerun()
-        
-        # Manual entry
-        col_manual, col_manual_btn = st.columns([3, 1])
-        with col_manual:
-            manual_id = st.text_input("Manual", placeholder="Or enter card ID manually...", label_visibility="collapsed", key="add_manual_id")
-        with col_manual_btn:
-            if st.button("+ Add", type="secondary", use_container_width=True, key="add_manual_btn"):
-                if manual_id and manual_id.strip():
-                    card_to_add = manual_id.strip()
-                    if card_to_add not in st.session_state.card_ids:
+        with col_btn:
+            if st.button("+ Add", type="secondary", use_container_width=True, key="add_card_btn"):
+                if card_input:
+                    # Extract ID if it's a preset format "Name (ID)", otherwise use as-is
+                    if "(" in str(card_input) and ")" in str(card_input):
+                        card_to_add = str(card_input).split("(")[-1].rstrip(")")
+                    else:
+                        card_to_add = str(card_input).strip()
+                    
+                    if card_to_add and card_to_add not in st.session_state.card_ids:
                         st.session_state.card_ids.append(card_to_add)
                         st.rerun()
         
@@ -1065,33 +1060,26 @@ with st.container(border=True):
     if "sync_card_ids" not in st.session_state:
         st.session_state.sync_card_ids = []
     
-    # Preset dropdown
-    col_sync_preset, col_sync_preset_btn = st.columns([3, 1])
-    with col_sync_preset:
-        sync_preset = st.selectbox(
-            "Preset",
-            options=[""] + preset_options_sync,
-            format_func=lambda x: "Select from common cards..." if x == "" else x,
+    col_sync_input, col_sync_btn = st.columns([3, 1])
+    with col_sync_input:
+        sync_card_input = st.selectbox(
+            "Card",
+            options=preset_options_sync,
+            index=None,
+            placeholder="Select preset or type card ID...",
             label_visibility="collapsed",
-            key="sync_card_preset"
+            accept_new_options=True,
+            key="sync_card_input"
         )
-    with col_sync_preset_btn:
-        if st.button("+ Add", type="secondary", use_container_width=True, key="sync_preset_btn"):
-            if sync_preset:
-                card_to_add = sync_preset.split("(")[-1].rstrip(")")
-                if card_to_add not in st.session_state.sync_card_ids:
-                    st.session_state.sync_card_ids.append(card_to_add)
-                    st.rerun()
-    
-    # Manual entry
-    col_sync_manual, col_sync_manual_btn = st.columns([3, 1])
-    with col_sync_manual:
-        sync_manual_id = st.text_input("Manual", placeholder="Or enter card ID manually...", label_visibility="collapsed", key="sync_manual_id")
-    with col_sync_manual_btn:
-        if st.button("+ Add", type="secondary", use_container_width=True, key="sync_manual_btn"):
-            if sync_manual_id and sync_manual_id.strip():
-                card_to_add = sync_manual_id.strip()
-                if card_to_add not in st.session_state.sync_card_ids:
+    with col_sync_btn:
+        if st.button("+ Add", type="secondary", use_container_width=True, key="sync_add_btn"):
+            if sync_card_input:
+                if "(" in str(sync_card_input) and ")" in str(sync_card_input):
+                    card_to_add = str(sync_card_input).split("(")[-1].rstrip(")")
+                else:
+                    card_to_add = str(sync_card_input).strip()
+                
+                if card_to_add and card_to_add not in st.session_state.sync_card_ids:
                     st.session_state.sync_card_ids.append(card_to_add)
                     st.rerun()
     
@@ -1170,33 +1158,26 @@ with st.container(border=True):
     if "push_card_ids" not in st.session_state:
         st.session_state.push_card_ids = []
     
-    # Preset dropdown
-    col_push_preset, col_push_preset_btn = st.columns([3, 1])
-    with col_push_preset:
-        push_preset = st.selectbox(
-            "Preset",
-            options=[""] + preset_options_push,
-            format_func=lambda x: "Select from common cards..." if x == "" else x,
+    col_push_input, col_push_btn = st.columns([3, 1])
+    with col_push_input:
+        push_card_input = st.selectbox(
+            "Card",
+            options=preset_options_push,
+            index=None,
+            placeholder="Select preset or type card ID...",
             label_visibility="collapsed",
-            key="push_card_preset"
+            accept_new_options=True,
+            key="push_card_input"
         )
-    with col_push_preset_btn:
-        if st.button("+ Add", type="secondary", use_container_width=True, key="push_preset_btn"):
-            if push_preset:
-                card_to_add = push_preset.split("(")[-1].rstrip(")")
-                if card_to_add not in st.session_state.push_card_ids:
-                    st.session_state.push_card_ids.append(card_to_add)
-                    st.rerun()
-    
-    # Manual entry
-    col_push_manual, col_push_manual_btn = st.columns([3, 1])
-    with col_push_manual:
-        push_manual_id = st.text_input("Manual", placeholder="Or enter card ID manually...", label_visibility="collapsed", key="push_manual_id")
-    with col_push_manual_btn:
-        if st.button("+ Add", type="secondary", use_container_width=True, key="push_manual_btn"):
-            if push_manual_id and push_manual_id.strip():
-                card_to_add = push_manual_id.strip()
-                if card_to_add not in st.session_state.push_card_ids:
+    with col_push_btn:
+        if st.button("+ Add", type="secondary", use_container_width=True, key="push_add_btn"):
+            if push_card_input:
+                if "(" in str(push_card_input) and ")" in str(push_card_input):
+                    card_to_add = str(push_card_input).split("(")[-1].rstrip(")")
+                else:
+                    card_to_add = str(push_card_input).strip()
+                
+                if card_to_add and card_to_add not in st.session_state.push_card_ids:
                     st.session_state.push_card_ids.append(card_to_add)
                     st.rerun()
     
