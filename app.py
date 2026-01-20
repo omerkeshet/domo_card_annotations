@@ -861,62 +861,53 @@ with col_add:
         preset_cards = get_preset_cards()
         preset_options = [f"{name} ({cid})" for cid, name in preset_cards.items()]
         
-        # Combine presets with any custom IDs already added
+        # Initialize session state
         if "card_ids" not in st.session_state:
             st.session_state.card_ids = []
         
-        # Build all available options (presets + any custom IDs already added)
-        all_options = preset_options.copy()
-        for cid in st.session_state.card_ids:
-            # Check if this ID is already in presets
-            if not any(cid in opt for opt in preset_options):
-                all_options.append(cid)
-        
-        # Convert current card_ids to display format
-        current_selection = []
-        for cid in st.session_state.card_ids:
-            # Find matching preset option or use raw ID
-            matching = [opt for opt in preset_options if cid in opt]
-            if matching:
-                current_selection.append(matching[0])
-            else:
-                current_selection.append(cid)
-        
-        col_select, col_add = st.columns([4, 1])
-        with col_select:
-            selected = st.multiselect(
-                "Cards",
-                options=all_options,
-                default=current_selection,
-                placeholder="Select cards or type ID...",
+        # Preset dropdown
+        col_preset, col_preset_btn = st.columns([3, 1])
+        with col_preset:
+            card_preset = st.selectbox(
+                "Preset",
+                options=[""] + preset_options,
+                format_func=lambda x: "Select from common cards..." if x == "" else x,
                 label_visibility="collapsed",
-                key="card_ids_multiselect"
+                key="add_card_preset"
             )
-        with col_add:
-            # Custom ID input
-            custom_id = st.text_input("Add", placeholder="ID", label_visibility="collapsed", key="custom_card_id")
+        with col_preset_btn:
+            if st.button("+ Add", type="secondary", use_container_width=True, key="add_preset_btn"):
+                if card_preset:
+                    card_to_add = card_preset.split("(")[-1].rstrip(")")
+                    if card_to_add not in st.session_state.card_ids:
+                        st.session_state.card_ids.append(card_to_add)
+                        st.rerun()
         
-        # Add custom ID button
-        if custom_id and custom_id.strip():
-            if st.button("+ Add Custom", type="secondary", use_container_width=True, key="add_custom_card"):
-                clean_id = custom_id.strip()
-                if clean_id not in st.session_state.card_ids:
-                    st.session_state.card_ids.append(clean_id)
-                    st.rerun()
+        # Manual entry
+        col_manual, col_manual_btn = st.columns([3, 1])
+        with col_manual:
+            manual_id = st.text_input("Manual", placeholder="Or enter card ID manually...", label_visibility="collapsed", key="add_manual_id")
+        with col_manual_btn:
+            if st.button("+ Add", type="secondary", use_container_width=True, key="add_manual_btn"):
+                if manual_id and manual_id.strip():
+                    card_to_add = manual_id.strip()
+                    if card_to_add not in st.session_state.card_ids:
+                        st.session_state.card_ids.append(card_to_add)
+                        st.rerun()
         
-        # Extract card IDs from selection and update session state
-        new_card_ids = []
-        for item in selected:
-            if "(" in item and ")" in item:
-                # Extract ID from "Name (ID)" format
-                card_id = item.split("(")[-1].rstrip(")")
-            else:
-                card_id = item
-            new_card_ids.append(card_id)
-        
-        if set(new_card_ids) != set(st.session_state.card_ids):
-            st.session_state.card_ids = new_card_ids
-            st.rerun()
+        # Display selected card IDs using multiselect (allows removal by clicking X)
+        if st.session_state.card_ids:
+            selected = st.multiselect(
+                "Selected cards",
+                options=st.session_state.card_ids,
+                default=st.session_state.card_ids,
+                label_visibility="collapsed",
+                key="card_ids_display"
+            )
+            # Update session state if user removed any
+            if set(selected) != set(st.session_state.card_ids):
+                st.session_state.card_ids = selected
+                st.rerun()
         
         st.write("")
         
@@ -1074,54 +1065,48 @@ with st.container(border=True):
     if "sync_card_ids" not in st.session_state:
         st.session_state.sync_card_ids = []
     
-    # Build all available options (presets + any custom IDs already added)
-    all_options_sync = preset_options_sync.copy()
-    for cid in st.session_state.sync_card_ids:
-        if not any(cid in opt for opt in preset_options_sync):
-            all_options_sync.append(cid)
-    
-    # Convert current card_ids to display format
-    current_sync_selection = []
-    for cid in st.session_state.sync_card_ids:
-        matching = [opt for opt in preset_options_sync if cid in opt]
-        if matching:
-            current_sync_selection.append(matching[0])
-        else:
-            current_sync_selection.append(cid)
-    
-    col_sync_select, col_sync_add = st.columns([4, 1])
-    with col_sync_select:
-        selected_sync = st.multiselect(
-            "Cards",
-            options=all_options_sync,
-            default=current_sync_selection,
-            placeholder="Select cards or type ID...",
+    # Preset dropdown
+    col_sync_preset, col_sync_preset_btn = st.columns([3, 1])
+    with col_sync_preset:
+        sync_preset = st.selectbox(
+            "Preset",
+            options=[""] + preset_options_sync,
+            format_func=lambda x: "Select from common cards..." if x == "" else x,
             label_visibility="collapsed",
-            key="sync_card_ids_multiselect"
+            key="sync_card_preset"
         )
-    with col_sync_add:
-        custom_sync_id = st.text_input("Add", placeholder="ID", label_visibility="collapsed", key="custom_sync_card_id")
+    with col_sync_preset_btn:
+        if st.button("+ Add", type="secondary", use_container_width=True, key="sync_preset_btn"):
+            if sync_preset:
+                card_to_add = sync_preset.split("(")[-1].rstrip(")")
+                if card_to_add not in st.session_state.sync_card_ids:
+                    st.session_state.sync_card_ids.append(card_to_add)
+                    st.rerun()
     
-    # Add custom ID button
-    if custom_sync_id and custom_sync_id.strip():
-        if st.button("+ Add Custom", type="secondary", use_container_width=True, key="add_custom_sync_card"):
-            clean_id = custom_sync_id.strip()
-            if clean_id not in st.session_state.sync_card_ids:
-                st.session_state.sync_card_ids.append(clean_id)
-                st.rerun()
+    # Manual entry
+    col_sync_manual, col_sync_manual_btn = st.columns([3, 1])
+    with col_sync_manual:
+        sync_manual_id = st.text_input("Manual", placeholder="Or enter card ID manually...", label_visibility="collapsed", key="sync_manual_id")
+    with col_sync_manual_btn:
+        if st.button("+ Add", type="secondary", use_container_width=True, key="sync_manual_btn"):
+            if sync_manual_id and sync_manual_id.strip():
+                card_to_add = sync_manual_id.strip()
+                if card_to_add not in st.session_state.sync_card_ids:
+                    st.session_state.sync_card_ids.append(card_to_add)
+                    st.rerun()
     
-    # Extract card IDs from selection and update session state
-    new_sync_card_ids = []
-    for item in selected_sync:
-        if "(" in item and ")" in item:
-            card_id = item.split("(")[-1].rstrip(")")
-        else:
-            card_id = item
-        new_sync_card_ids.append(card_id)
-    
-    if set(new_sync_card_ids) != set(st.session_state.sync_card_ids):
-        st.session_state.sync_card_ids = new_sync_card_ids
-        st.rerun()
+    # Display selected card IDs
+    if st.session_state.sync_card_ids:
+        selected_sync = st.multiselect(
+            "Selected cards",
+            options=st.session_state.sync_card_ids,
+            default=st.session_state.sync_card_ids,
+            label_visibility="collapsed",
+            key="sync_card_ids_display"
+        )
+        if set(selected_sync) != set(st.session_state.sync_card_ids):
+            st.session_state.sync_card_ids = selected_sync
+            st.rerun()
     
     # Date range for sync
     col_sync_start, col_sync_end, col_sync_action = st.columns([2, 2, 1])
@@ -1185,54 +1170,48 @@ with st.container(border=True):
     if "push_card_ids" not in st.session_state:
         st.session_state.push_card_ids = []
     
-    # Build all available options (presets + any custom IDs already added)
-    all_options_push = preset_options_push.copy()
-    for cid in st.session_state.push_card_ids:
-        if not any(cid in opt for opt in preset_options_push):
-            all_options_push.append(cid)
-    
-    # Convert current card_ids to display format
-    current_push_selection = []
-    for cid in st.session_state.push_card_ids:
-        matching = [opt for opt in preset_options_push if cid in opt]
-        if matching:
-            current_push_selection.append(matching[0])
-        else:
-            current_push_selection.append(cid)
-    
-    col_push_select, col_push_add = st.columns([4, 1])
-    with col_push_select:
-        selected_push = st.multiselect(
-            "Cards",
-            options=all_options_push,
-            default=current_push_selection,
-            placeholder="Select cards or type ID...",
+    # Preset dropdown
+    col_push_preset, col_push_preset_btn = st.columns([3, 1])
+    with col_push_preset:
+        push_preset = st.selectbox(
+            "Preset",
+            options=[""] + preset_options_push,
+            format_func=lambda x: "Select from common cards..." if x == "" else x,
             label_visibility="collapsed",
-            key="push_card_ids_multiselect"
+            key="push_card_preset"
         )
-    with col_push_add:
-        custom_push_id = st.text_input("Add", placeholder="ID", label_visibility="collapsed", key="custom_push_card_id")
+    with col_push_preset_btn:
+        if st.button("+ Add", type="secondary", use_container_width=True, key="push_preset_btn"):
+            if push_preset:
+                card_to_add = push_preset.split("(")[-1].rstrip(")")
+                if card_to_add not in st.session_state.push_card_ids:
+                    st.session_state.push_card_ids.append(card_to_add)
+                    st.rerun()
     
-    # Add custom ID button
-    if custom_push_id and custom_push_id.strip():
-        if st.button("+ Add Custom", type="secondary", use_container_width=True, key="add_custom_push_card"):
-            clean_id = custom_push_id.strip()
-            if clean_id not in st.session_state.push_card_ids:
-                st.session_state.push_card_ids.append(clean_id)
-                st.rerun()
+    # Manual entry
+    col_push_manual, col_push_manual_btn = st.columns([3, 1])
+    with col_push_manual:
+        push_manual_id = st.text_input("Manual", placeholder="Or enter card ID manually...", label_visibility="collapsed", key="push_manual_id")
+    with col_push_manual_btn:
+        if st.button("+ Add", type="secondary", use_container_width=True, key="push_manual_btn"):
+            if push_manual_id and push_manual_id.strip():
+                card_to_add = push_manual_id.strip()
+                if card_to_add not in st.session_state.push_card_ids:
+                    st.session_state.push_card_ids.append(card_to_add)
+                    st.rerun()
     
-    # Extract card IDs from selection and update session state
-    new_push_card_ids = []
-    for item in selected_push:
-        if "(" in item and ")" in item:
-            card_id = item.split("(")[-1].rstrip(")")
-        else:
-            card_id = item
-        new_push_card_ids.append(card_id)
-    
-    if set(new_push_card_ids) != set(st.session_state.push_card_ids):
-        st.session_state.push_card_ids = new_push_card_ids
-        st.rerun()
+    # Display selected card IDs
+    if st.session_state.push_card_ids:
+        selected_push = st.multiselect(
+            "Selected cards",
+            options=st.session_state.push_card_ids,
+            default=st.session_state.push_card_ids,
+            label_visibility="collapsed",
+            key="push_card_ids_display"
+        )
+        if set(selected_push) != set(st.session_state.push_card_ids):
+            st.session_state.push_card_ids = selected_push
+            st.rerun()
     
     # Date range for push
     col_push_start, col_push_end = st.columns(2)
