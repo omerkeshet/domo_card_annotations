@@ -831,7 +831,7 @@ with col_add:
     with st.container(border=True):
         st.markdown("""<div class='label'>Add Annotation 
             <span class="info-tooltip">ⓘ
-                <span class="tooltiptext">כאן ניתן להוסיף הערה חדשה. מלאו את התוכן, בחרו תאריך וצבע. אם רוצים להוסיף לכרטיס דומו - הוסיפו מזהה כרטיס. בלי כרטיס - ההערה תישמר רק בסנופלייק.</span>
+                <span class="tooltiptext">כאן ניתן להוסיף הערה חדשה. מלאו את התוכן, בחרו תאריך וצבע. אם רוצים להוסיף קארד דומו - הוסיפו מזהה קארד. בלי קארד - ההערה תישמר רק בסנואופלייק.</span>
             </span>
         </div>""", unsafe_allow_html=True)
         st.markdown(
@@ -955,7 +955,7 @@ with col_delete:
     with st.container(border=True):
         st.markdown("""<div class='label'>Delete Annotation 
             <span class="info-tooltip">ⓘ
-                <span class="tooltiptext">כאן ניתן למחוק הערה קיימת. בחרו טווח תאריכים ולחצו Load Annotations. בחרו הערה מהרשימה ולחצו Delete. ההערה תימחק מסנופלייק ומדומו.</span>
+                <span class="tooltiptext">כאן ניתן למחוק הערה קיימת. בחרו טווח תאריכים ולחצו Load Annotations. בחרו הערה מהרשימה ולחצו Delete. ההערה תימחק מסנואופלייק ומדומו.</span>
             </span>
         </div>""", unsafe_allow_html=True)
         st.markdown(
@@ -1041,7 +1041,7 @@ st.write("")
 with st.container(border=True):
     st.markdown("""<div class='label'>Sync Card 
         <span class="info-tooltip">ⓘ
-            <span class="tooltiptext">סנכרון מדומו לסנופלייק. הוסיפו מזהי כרטיסים, בחרו טווח תאריכים ולחצו Sync. הערות חדשות יתווספו, הערות שהשתנו יעודכנו. לא מתבצעת מחיקה.</span>
+            <span class="tooltiptext">סנכרון מדומו לסנואופלייק. הוסיפו מזהי קארדים, בחרו טווח תאריכים ולחצו Sync. הערות חדשות יתווספו, הערות שהשתנו יעודכנו. לא מתבצעת מחיקה.</span>
         </span>
     </div>""", unsafe_allow_html=True)
     st.markdown(
@@ -1139,7 +1139,7 @@ st.write("")
 with st.container(border=True):
     st.markdown("""<div class='label'>Push to Domo 
         <span class="info-tooltip">ⓘ
-            <span class="tooltiptext">דחיפת הערות מסנופלייק לדומו. הוסיפו מזהי כרטיסי יעד, בחרו טווח תאריכים וצבעים (ריק = הכל), ולחצו Push. ההערות יתווספו לכל הכרטיסים שנבחרו.</span>
+            <span class="tooltiptext">דחיפת הערות מסנואופלייק לדומו. הוסיפו מזהי קארד יעד, בחרו טווח תאריכים וצבעים (ריק = הכל), ולחצו Push. ההערות יתווספו לכל הקארדים שנבחרו.</span>
         </span>
     </div>""", unsafe_allow_html=True)
     st.markdown(
@@ -1254,7 +1254,7 @@ with st.container(border=True):
     with col_header:
         st.markdown("""<div class='label'>All Annotations 
             <span class="info-tooltip">ⓘ
-                <span class="tooltiptext">צפייה בכל ההערות מסנופלייק. סננו לפי תאריכים ולחצו Apply. ניתן לעבור בין תצוגת טבלה לציר זמן, לייצא ל-CSV ולרענן.</span>
+                <span class="tooltiptext">צפייה בכל ההערות מסנואופלייק. סננו לפי תאריכים ולחצו Apply. ניתן לעבור בין תצוגת טבלה לציר זמן, לייצא ל-CSV ולרענן.</span>
             </span>
         </div>""", unsafe_allow_html=True)
         st.markdown(
