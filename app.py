@@ -19,7 +19,7 @@ import snowflake.connector
 # ==========================
 st.set_page_config(
     page_title="Annotations Manager",
-    page_icon=Path("assets/logo.png"),
+    page_icon=Path("assets/annotation_logo.svg"),
     layout="centered",
     initial_sidebar_state="collapsed"
 )
@@ -735,11 +735,7 @@ if "card_ids" not in st.session_state:
 # ==========================
 
 # Header
-col_logo, col_title = st.columns([0.5, 4])
-with col_logo:
-    st.image("assets/logo.png", width=50)
-with col_title:
-    st.title("Annotations Manager")
+st.title("Annotations Manager")
 st.markdown(
     "<div class='muted'>Create and manage annotations. Optionally add to Domo cards.</div>",
     unsafe_allow_html=True,
@@ -755,7 +751,12 @@ col_add, col_delete = st.columns(2, gap="medium")
 # ==========================
 with col_add:
     with st.container(border=True):
-        st.markdown("<div class='label'>Add Annotation</div>", unsafe_allow_html=True)
+        col_label, col_info = st.columns([6, 0.5])
+        with col_label:
+            st.markdown("<div class='label'>Add Annotation</div>", unsafe_allow_html=True)
+        with col_info:
+            with st.popover("ℹ️"):
+                st.markdown("**הוספת הערה**\n\nכאן ניתן להוסיף הערה חדשה.\n\n• מלאו את תוכן ההערה\n• בחרו תאריך וצבע\n• אם רוצים להוסיף לכרטיס דומו - הוסיפו מזהה כרטיס\n• אם לא מוסיפים כרטיס - ההערה תישמר רק בסנופלייק")
         st.markdown(
             "<div class='desc'>Create a new annotation. Optionally add to Domo cards.</div>",
             unsafe_allow_html=True,
@@ -853,7 +854,12 @@ with col_add:
 # ==========================
 with col_delete:
     with st.container(border=True):
-        st.markdown("<div class='label'>Delete Annotation</div>", unsafe_allow_html=True)
+        col_label, col_info = st.columns([6, 0.5])
+        with col_label:
+            st.markdown("<div class='label'>Delete Annotation</div>", unsafe_allow_html=True)
+        with col_info:
+            with st.popover("ℹ️"):
+                st.markdown("**מחיקת הערה**\n\nכאן ניתן למחוק הערה קיימת.\n\n• בחרו טווח תאריכים\n• לחצו 'Load Annotations' לטעינת ההערות\n• בחרו הערה מהרשימה ולחצו 'Delete Selected'\n• ההערה תימחק מסנופלייק ומדומו (אם קיימת שם)")
         st.markdown(
             "<div class='desc'>Filter by date range and select annotation to delete.</div>",
             unsafe_allow_html=True,
@@ -935,7 +941,12 @@ st.write("")
 # SYNC SECTION
 # ==========================
 with st.container(border=True):
-    st.markdown("<div class='label'>Sync Card</div>", unsafe_allow_html=True)
+    col_label, col_info = st.columns([6, 0.5])
+    with col_label:
+        st.markdown("<div class='label'>Sync Card</div>", unsafe_allow_html=True)
+    with col_info:
+        with st.popover("ℹ️"):
+            st.markdown("**סנכרון מדומו לסנופלייק**\n\nכאן ניתן לסנכרן הערות מכרטיסי דומו לסנופלייק.\n\n• הוסיפו מזהי כרטיסים\n• בחרו טווח תאריכים\n• לחצו 'Sync'\n• הערות שקיימות בדומו ולא בסנופלייק יתווספו\n• הערות שהשתנו יעודכנו\n• לא מתבצעת מחיקה מסנופלייק")
     st.markdown(
         "<div class='desc'>Sync annotations from Domo to Snowflake for specific cards.</div>",
         unsafe_allow_html=True,
@@ -1015,7 +1026,12 @@ st.write("")
 # PUSH TO DOMO SECTION
 # ==========================
 with st.container(border=True):
-    st.markdown("<div class='label'>Push to Domo</div>", unsafe_allow_html=True)
+    col_label, col_info = st.columns([6, 0.5])
+    with col_label:
+        st.markdown("<div class='label'>Push to Domo</div>", unsafe_allow_html=True)
+    with col_info:
+        with st.popover("ℹ️"):
+            st.markdown("**דחיפה לדומו**\n\nכאן ניתן לדחוף הערות מסנופלייק לכרטיסי דומו.\n\n• הוסיפו מזהי כרטיסי יעד\n• בחרו טווח תאריכים\n• בחרו צבעים (ריק = כל הצבעים)\n• לחצו 'Push to Domo'\n• כל ההערות המתאימות יתווספו לכרטיסים שנבחרו")
     st.markdown(
         "<div class='desc'>Insert Snowflake annotations into Domo cards.</div>",
         unsafe_allow_html=True,
@@ -1110,19 +1126,23 @@ st.write("")
 # VIEW ALL ANNOTATIONS
 # ==========================
 with st.container(border=True):
-    col_header, col_toggle, col_refresh = st.columns([3, 1.5, 1])
+    col_header, col_info, col_toggle, col_refresh = st.columns([3, 0.3, 1.5, 1])
     with col_header:
         st.markdown("<div class='label'>All Annotations</div>", unsafe_allow_html=True)
-        st.markdown(
-            "<div class='desc'>View all annotations from Snowflake.</div>",
-            unsafe_allow_html=True,
-        )
+    with col_info:
+        with st.popover("ℹ️"):
+            st.markdown("**כל ההערות**\n\nכאן ניתן לצפות בכל ההערות מסנופלייק.\n\n• סננו לפי טווח תאריכים\n• לחצו 'Apply' להחלת הסינון\n• עברו בין תצוגת טבלה לציר זמן\n• לחצו 'Export CSV' להורדת הנתונים\n• לחצו 'Refresh' לרענון הנתונים")
     with col_toggle:
         view_mode = st.toggle("Timeline View", value=False)
     with col_refresh:
         if st.button("↻ Refresh", type="secondary", use_container_width=True, key="refresh_all"):
             st.session_state.all_annotations = get_snowflake_annotations()
             st.rerun()
+    
+    st.markdown(
+        "<div class='desc'>View all annotations from Snowflake.</div>",
+        unsafe_allow_html=True,
+    )
     
     # Date filter
     col_filter_start, col_filter_end, col_filter_btn = st.columns([2, 2, 1])
