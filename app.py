@@ -317,6 +317,15 @@ ANNOTATION_COLORS = {
 
 COLOR_NAME_MAP = {v: k for k, v in ANNOTATION_COLORS.items()}
 
+# Color display options with colored circles
+COLOR_DISPLAY = {
+    "Blue": "🔵 Blue",
+    "Green": "🟢 Green",
+    "Red": "🔴 Red",
+    "Yellow": "🟡 Yellow",
+    "Purple": "🟣 Purple",
+}
+
 # Preset card IDs (add more as needed)
 PRESET_CARD_IDS = [
     "954563232",
@@ -852,7 +861,13 @@ with col_add:
             annotation_date = st.date_input("Date", value=date.today(), label_visibility="collapsed", key="add_date")
         with col_color:
             st.markdown("<div class='tiny'>Color</div>", unsafe_allow_html=True)
-            color_name = st.selectbox("Color", options=list(ANNOTATION_COLORS.keys()), label_visibility="collapsed", key="add_color")
+            color_name = st.selectbox(
+                "Color",
+                options=list(ANNOTATION_COLORS.keys()),
+                format_func=lambda x: COLOR_DISPLAY.get(x, x),
+                label_visibility="collapsed",
+                key="add_color"
+            )
         
         # Card IDs section
         st.markdown("<div class='tiny'>Card IDs (optional)</div>", unsafe_allow_html=True)
@@ -1238,6 +1253,7 @@ with st.container(border=True):
         "Colors",
         options=list(ANNOTATION_COLORS.keys()),
         default=[],
+        format_func=lambda x: COLOR_DISPLAY.get(x, x),
         label_visibility="collapsed",
         key="push_colors"
     )
