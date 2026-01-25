@@ -906,47 +906,76 @@ with col_add:
         
         st.write("")
         
+        # Initialize confirmation state
+        if "show_no_card_warning" not in st.session_state:
+            st.session_state.show_no_card_warning = False
+        
         if st.button("Add Annotation", type="primary", use_container_width=True):
             if not annotation_text:
                 st.error("Please enter annotation text")
+            elif not st.session_state.card_ids:
+                # No card selected - show warning
+                st.session_state.show_no_card_warning = True
+                st.session_state.pending_annotation = {
+                    "text": annotation_text,
+                    "date": annotation_date,
+                    "color": color_name
+                }
+                st.rerun()
             else:
                 with st.spinner("Adding annotation..."):
                     entry_date_str = annotation_date.strftime("%Y-%m-%d")
                     color_hex = ANNOTATION_COLORS[color_name]
                     
-                    if st.session_state.card_ids:
-                        # Add to Domo cards + Snowflake
-                        success_cards = []
-                        for cid in st.session_state.card_ids:
-                            domo_ann = add_annotation_to_domo(cid, annotation_text, entry_date_str, color_hex)
-                            if domo_ann:
-                                # Insert to Snowflake with card ID and annotation ID
-                                sf_success = insert_annotation_to_snowflake(
-                                    content=annotation_text,
-                                    entry_date=entry_date_str,
-                                    color=color_hex,
-                                    card_id=int(cid),
-                                    annotation_id=domo_ann.get("id"),
-                                    user_id=domo_ann.get("userId"),
-                                    user_name=domo_ann.get("userName")
-                                )
-                                if sf_success:
-                                    success_cards.append(cid)
-                        
-                        if success_cards:
-                            st.success(f"Annotation added to cards: {', '.join(success_cards)}")
-                            st.session_state.card_ids = []
-                            st.rerun()
-                    else:
-                        # Snowflake only (global annotation)
+                    # Add to Domo cards + Snowflake
+                    success_cards = []
+                    for cid in st.session_state.card_ids:
+                        domo_ann = add_annotation_to_domo(cid, annotation_text, entry_date_str, color_hex)
+                        if domo_ann:
+                            # Insert to Snowflake with card ID and annotation ID
+                            sf_success = insert_annotation_to_snowflake(
+                                content=annotation_text,
+                                entry_date=entry_date_str,
+                                color=color_hex,
+                                card_id=int(cid),
+                                annotation_id=domo_ann.get("id"),
+                                user_id=domo_ann.get("userId"),
+                                user_name=domo_ann.get("userName")
+                            )
+                            if sf_success:
+                                success_cards.append(cid)
+                    
+                    if success_cards:
+                        st.success(f"Annotation added to cards: {', '.join(success_cards)}")
+                        st.session_state.card_ids = []
+                        st.rerun()
+        
+        # Warning dialog when no card is selected
+        if st.session_state.show_no_card_warning:
+            st.warning("⚠️ No card selected! This annotation will be saved to Snowflake only and won't appear on any Domo card.")
+            col_confirm, col_cancel = st.columns(2)
+            with col_confirm:
+                if st.button("✓ Add anyway", type="primary", use_container_width=True, key="confirm_no_card"):
+                    pending = st.session_state.pending_annotation
+                    entry_date_str = pending["date"].strftime("%Y-%m-%d")
+                    color_hex = ANNOTATION_COLORS[pending["color"]]
+                    
+                    with st.spinner("Adding annotation..."):
                         sf_success = insert_annotation_to_snowflake(
-                            content=annotation_text,
+                            content=pending["text"],
                             entry_date=entry_date_str,
                             color=color_hex
                         )
                         if sf_success:
+                            st.session_state.show_no_card_warning = False
+                            st.session_state.pop("pending_annotation", None)
                             st.success("Global annotation added to Snowflake!")
                             st.rerun()
+            with col_cancel:
+                if st.button("✗ Cancel", type="secondary", use_container_width=True, key="cancel_no_card"):
+                    st.session_state.show_no_card_warning = False
+                    st.session_state.pop("pending_annotation", None)
+                    st.rerun()
 
 # ==========================
 # DELETE ANNOTATION
