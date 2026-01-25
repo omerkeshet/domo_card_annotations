@@ -1170,33 +1170,36 @@ with st.container(border=True):
         total_cards = len(st.session_state.sync_card_ids)
         processed = st.session_state.sync_results.get("processed", 0)
         
-        st.progress(processed / total_cards if total_cards > 0 else 0, text=f"Syncing card {processed + 1} of {total_cards}...")
-        
-        if st.button("✗ Cancel Sync", type="secondary", use_container_width=True, key="cancel_sync_progress"):
-            st.session_state.sync_cancelled = True
-            st.session_state.sync_in_progress = False
-            st.warning(f"Sync cancelled. Processed {processed} of {total_cards} cards.")
-            st.rerun()
-        
-        # Process next card
-        if processed < total_cards and not st.session_state.sync_cancelled:
-            card_id = st.session_state.sync_card_ids[processed]
-            results = sync_card_annotations(
-                card_id,
-                start_date=sync_start_date.strftime("%Y-%m-%d"),
-                end_date=sync_end_date.strftime("%Y-%m-%d")
-            )
-            st.session_state.sync_results["inserted"] += results["inserted"]
-            st.session_state.sync_results["updated"] += results["updated"]
-            st.session_state.sync_results["skipped"] += results["skipped"]
-            st.session_state.sync_results["processed"] += 1
-            st.rerun()
-        elif processed >= total_cards:
-            # Completed
+        # Check if completed
+        if processed >= total_cards:
+            # Completed - show success and reset
             st.session_state.sync_in_progress = False
             r = st.session_state.sync_results
             st.success(f"Sync complete! Inserted: {r['inserted']}, Updated: {r['updated']}, Skipped: {r['skipped']}")
             st.session_state.sync_results = {"inserted": 0, "updated": 0, "skipped": 0, "processed": 0}
+        else:
+            # Still processing - show progress
+            st.progress((processed + 1) / total_cards, text=f"Syncing card {processed + 1} of {total_cards}...")
+            
+            if st.button("✗ Cancel Sync", type="secondary", use_container_width=True, key="cancel_sync_progress"):
+                st.session_state.sync_cancelled = True
+                st.session_state.sync_in_progress = False
+                st.warning(f"Sync cancelled. Processed {processed} of {total_cards} cards.")
+                st.rerun()
+            
+            # Process current card
+            if not st.session_state.sync_cancelled:
+                card_id = st.session_state.sync_card_ids[processed]
+                results = sync_card_annotations(
+                    card_id,
+                    start_date=sync_start_date.strftime("%Y-%m-%d"),
+                    end_date=sync_end_date.strftime("%Y-%m-%d")
+                )
+                st.session_state.sync_results["inserted"] += results["inserted"]
+                st.session_state.sync_results["updated"] += results["updated"]
+                st.session_state.sync_results["skipped"] += results["skipped"]
+                st.session_state.sync_results["processed"] += 1
+                st.rerun()
 
 st.write("")
 
@@ -1305,32 +1308,9 @@ with st.container(border=True):
         total_cards = len(st.session_state.push_card_ids)
         processed = st.session_state.push_results.get("processed", 0)
         
-        st.progress(processed / total_cards if total_cards > 0 else 0, text=f"Pushing to card {processed + 1} of {total_cards}...")
-        
-        if st.button("✗ Cancel Push", type="secondary", use_container_width=True, key="cancel_push_progress"):
-            st.session_state.push_cancelled = True
-            st.session_state.push_in_progress = False
-            r = st.session_state.push_results
-            st.warning(f"Push cancelled. Pushed {r['pushed']} annotations to {processed} of {total_cards} cards.")
-            st.rerun()
-        
-        # Process next card
-        if processed < total_cards and not st.session_state.push_cancelled:
-            card_id = st.session_state.push_card_ids[processed]
-            results = push_to_domo(
-                card_id,
-                start_date=push_start_date.strftime("%Y-%m-%d"),
-                end_date=push_end_date.strftime("%Y-%m-%d"),
-                colors=st.session_state.push_color_hex_values
-            )
-            st.session_state.push_results["pushed"] += results["pushed"]
-            st.session_state.push_results["failed"] += results["failed"]
-            if results["pushed"] > 0:
-                st.session_state.push_results["success_cards"].append(card_id)
-            st.session_state.push_results["processed"] += 1
-            st.rerun()
-        elif processed >= total_cards:
-            # Completed
+        # Check if completed
+        if processed >= total_cards:
+            # Completed - show success and reset
             st.session_state.push_in_progress = False
             r = st.session_state.push_results
             if r["pushed"] > 0:
@@ -1340,6 +1320,32 @@ with st.container(border=True):
             if r["pushed"] == 0 and r["failed"] == 0:
                 st.info("No annotations found matching the filters")
             st.session_state.push_results = {"pushed": 0, "failed": 0, "processed": 0, "success_cards": []}
+        else:
+            # Still processing - show progress
+            st.progress((processed + 1) / total_cards, text=f"Pushing to card {processed + 1} of {total_cards}...")
+            
+            if st.button("✗ Cancel Push", type="secondary", use_container_width=True, key="cancel_push_progress"):
+                st.session_state.push_cancelled = True
+                st.session_state.push_in_progress = False
+                r = st.session_state.push_results
+                st.warning(f"Push cancelled. Pushed {r['pushed']} annotations to {processed} of {total_cards} cards.")
+                st.rerun()
+            
+            # Process current card
+            if not st.session_state.push_cancelled:
+                card_id = st.session_state.push_card_ids[processed]
+                results = push_to_domo(
+                    card_id,
+                    start_date=push_start_date.strftime("%Y-%m-%d"),
+                    end_date=push_end_date.strftime("%Y-%m-%d"),
+                    colors=st.session_state.push_color_hex_values
+                )
+                st.session_state.push_results["pushed"] += results["pushed"]
+                st.session_state.push_results["failed"] += results["failed"]
+                if results["pushed"] > 0:
+                    st.session_state.push_results["success_cards"].append(card_id)
+                st.session_state.push_results["processed"] += 1
+                st.rerun()
 
 st.write("")
 
