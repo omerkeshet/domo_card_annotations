@@ -1144,7 +1144,7 @@ with st.container(border=True):
     col_sync_start, col_sync_end, col_sync_action = st.columns([2, 2, 1])
     with col_sync_start:
         st.markdown("<div class='tiny'>From Date</div>", unsafe_allow_html=True)
-        sync_start_date = st.date_input("Sync From", value=date.today() - timedelta(days=365), label_visibility="collapsed", key="sync_start")
+        sync_start_date = st.date_input("Sync From", value=date.today() - timedelta(days=1), label_visibility="collapsed", key="sync_start")
     with col_sync_end:
         st.markdown("<div class='tiny'>To Date</div>", unsafe_allow_html=True)
         sync_end_date = st.date_input("Sync To", value=date.today(), label_visibility="collapsed", key="sync_end")
@@ -1242,7 +1242,7 @@ with st.container(border=True):
     col_push_start, col_push_end = st.columns(2)
     with col_push_start:
         st.markdown("<div class='tiny'>From Date</div>", unsafe_allow_html=True)
-        push_start_date = st.date_input("Push From", value=date.today() - timedelta(days=365), label_visibility="collapsed", key="push_start")
+        push_start_date = st.date_input("Push From", value=date.today() - timedelta(days=1), label_visibility="collapsed", key="push_start")
     with col_push_end:
         st.markdown("<div class='tiny'>To Date</div>", unsafe_allow_html=True)
         push_end_date = st.date_input("Push To", value=date.today(), label_visibility="collapsed", key="push_end")
@@ -1317,7 +1317,7 @@ with st.container(border=True):
     col_filter_start, col_filter_end, col_filter_btn = st.columns([2, 2, 1])
     with col_filter_start:
         st.markdown("<div class='tiny'>From Date</div>", unsafe_allow_html=True)
-        filter_start = st.date_input("From", value=date.today() - timedelta(days=365), label_visibility="collapsed", key="filter_start")
+        filter_start = st.date_input("From", value=date.today() - timedelta(days=1), label_visibility="collapsed", key="filter_start")
     with col_filter_end:
         st.markdown("<div class='tiny'>To Date</div>", unsafe_allow_html=True)
         filter_end = st.date_input("To", value=date.today(), label_visibility="collapsed", key="filter_end")
