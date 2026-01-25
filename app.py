@@ -1289,7 +1289,7 @@ with st.container(border=True):
             st.session_state.push_in_progress = True
             st.session_state.push_cancelled = False
             st.session_state.push_results = {"pushed": 0, "failed": 0, "processed": 0, "success_cards": []}
-            st.session_state.push_colors = color_hex_values
+            st.session_state.push_color_hex_values = color_hex_values
             st.rerun()
         else:
             st.error("Please add at least one card ID")
@@ -1321,7 +1321,7 @@ with st.container(border=True):
                 card_id,
                 start_date=push_start_date.strftime("%Y-%m-%d"),
                 end_date=push_end_date.strftime("%Y-%m-%d"),
-                colors=st.session_state.push_colors
+                colors=st.session_state.push_color_hex_values
             )
             st.session_state.push_results["pushed"] += results["pushed"]
             st.session_state.push_results["failed"] += results["failed"]
@@ -1453,10 +1453,10 @@ with st.container(border=True):
                     "Content": ann.get("CONTENT"),
                     "Date": str(ann.get("ENTRY_DATE", "—")),
                     "Color": COLOR_NAME_MAP.get(ann.get("COLOR"), ann.get("COLOR", "—")),
-                    "Card ID": ann.get("CARD_ID") if ann.get("CARD_ID") else "Global",
+                    "Card ID": str(ann.get("CARD_ID")) if ann.get("CARD_ID") else "Global",
                     "Created By": ann.get("DOMO_USER_NAME", "—"),
                     "Created": created_str,
-                    "ID": ann.get("ID") if ann.get("ID") else "—",
+                    "ID": str(ann.get("ID")) if ann.get("ID") else "—",
                 })
             
             df = pd.DataFrame(df_data)
