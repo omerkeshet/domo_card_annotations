@@ -714,6 +714,98 @@ def main():
             return False
     
     
+    def call_domo_ai_classify(content: str) -> Optional[str]:
+        """Call Domo AI Chat Messages API to classify annotation content."""
+        url = f"https://{DOMO_INSTANCE}.domo.com/api/ai/v1/messages/chat"
+        payload = {
+            "system": [
+                {
+                    "type": "TEXT",
+                    "text": (
+                        "You are a media event classifier for an Israeli media company (Mako/Keshet). "
+                        "Classify the given text into exactly one of these categories:\n"
+                        "תקלת_מדידה, מלחמה_וביטחון, פיגוע_ותאונה, משפט_ומשפטי, ספורט, פוליטיקה, בידור_ותרבות, אחר\n"
+                        "Return only the category name in Hebrew, nothing else."
+                    )
+                }
+            ],
+            "input": [
+                {
+                    "role": "USER",
+                    "content": [{"type": "TEXT", "text": content}]
+                }
+            ],
+            "maxTokens": 50,
+        }
+        try:
+            r = requests.post(url, headers=product_headers(DOMO_DEVELOPER_TOKEN), json=payload, timeout=30)
+            if r.status_code == 200:
+                data = r.json()
+                content_blocks = data.get("content", [])
+                for block in content_blocks:
+                    if block.get("type") == "TEXT":
+                        return block.get("text", "").strip()
+        except Exception:
+            pass
+        return None
+
+
+    def assign_categories_snowflake(start_date: str, end_date: str) -> Dict[str, int]:
+        """
+        For each row in the date range where CATEGORY IS NULL,
+        call Domo AI to classify and UPDATE the CATEGORY column.
+        """
+        results = {"updated": 0, "skipped": 0, "failed": 0}
+        try:
+            conn = get_snowflake_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT ID, CONTENT, ENTRY_DATE
+                FROM {SNOWFLAKE_TABLE}
+                WHERE ENTRY_DATE >= %s
+                  AND ENTRY_DATE <= %s
+                  AND (CATEGORY IS NULL OR CATEGORY = '')
+                ORDER BY ENTRY_DATE
+                """,
+                (start_date, end_date)
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            st.error(f"Snowflake read error: {str(e)}")
+            return results
+
+        for row in rows:
+            row_id, content, entry_date = row
+            category = call_domo_ai_classify(content)
+            if not category:
+                results["failed"] += 1
+                continue
+            try:
+                conn = get_snowflake_connection()
+                cursor = conn.cursor()
+                if row_id is not None:
+                    cursor.execute(
+                        f"UPDATE {SNOWFLAKE_TABLE} SET CATEGORY = %s WHERE ID = %s",
+                        (category, row_id)
+                    )
+                else:
+                    cursor.execute(
+                        f"UPDATE {SNOWFLAKE_TABLE} SET CATEGORY = %s WHERE CONTENT = %s AND ENTRY_DATE = %s AND ID IS NULL",
+                        (category, content, str(entry_date))
+                    )
+                conn.commit()
+                cursor.close()
+                conn.close()
+                results["updated"] += 1
+            except Exception as e:
+                results["failed"] += 1
+
+        return results
+
+
     def sync_card_annotations(card_id: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, int]:
         """
         Sync annotations from Domo to Snowflake for a specific card.
@@ -1376,7 +1468,58 @@ def main():
                     st.rerun()
     
     st.write("")
-    
+
+    # ==========================
+    # ASSIGN CATEGORIES
+    # ==========================
+    with st.container(border=True):
+        st.markdown("""<div class='label'>Assign Categories
+            <span class="info-tooltip">ⓘ
+                <span class="tooltiptext">בחרו טווח תאריכים ולחצו Assign Category. המערכת תשלח כל הערה ללא קטגוריה ל-Domo AI ותעדכן את עמודת CATEGORY בסנואופלייק.</span>
+            </span>
+        </div>""", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='desc'>Use Domo AI to classify uncategorized annotations in a date range.</div>",
+            unsafe_allow_html=True,
+        )
+
+        col_cat_start, col_cat_end, col_cat_btn = st.columns([2, 2, 1])
+        with col_cat_start:
+            st.markdown("<div class='tiny'>From Date</div>", unsafe_allow_html=True)
+            cat_start = st.date_input(
+                "From", value=date.today() - timedelta(days=30),
+                label_visibility="collapsed", key="cat_start"
+            )
+        with col_cat_end:
+            st.markdown("<div class='tiny'>To Date</div>", unsafe_allow_html=True)
+            cat_end = st.date_input(
+                "To", value=date.today(),
+                label_visibility="collapsed", key="cat_end"
+            )
+        with col_cat_btn:
+            st.markdown("<div class='tiny'>&nbsp;</div>", unsafe_allow_html=True)
+            assign_clicked = st.button("✦ Assign", type="primary", use_container_width=True, key="assign_category_btn")
+
+        if assign_clicked:
+            if cat_start > cat_end:
+                st.error("Start date must be before end date.")
+            else:
+                with st.spinner("Classifying annotations via Domo AI…"):
+                    cat_results = assign_categories_snowflake(
+                        cat_start.strftime("%Y-%m-%d"),
+                        cat_end.strftime("%Y-%m-%d")
+                    )
+                total = cat_results["updated"] + cat_results["skipped"] + cat_results["failed"]
+                if total == 0:
+                    st.info("No uncategorized annotations found in this date range.")
+                else:
+                    if cat_results["updated"] > 0:
+                        st.success(f"✓ Categorized {cat_results['updated']} annotation(s).")
+                    if cat_results["failed"] > 0:
+                        st.warning(f"{cat_results['failed']} annotation(s) could not be classified.")
+
+    st.write("")
+
     # ==========================
     # VIEW ALL ANNOTATIONS
     # ==========================
